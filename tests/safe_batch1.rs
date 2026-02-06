@@ -173,3 +173,30 @@ fn unwrap_function_shells_unwraps_apply_arguments_forwarder() {
     assert!(!output.contains(".apply(this, arguments)"));
     assert!(output.contains("return x + 3"));
 }
+
+#[test]
+fn resolve_proxy_calls_rewrites_proxy_function_identifier_uses() {
+    let input = "function proxy(a, b) { return target(a, b); }\nconst x = proxy(1, 2);\n";
+    let output = run(input);
+
+    assert!(output.contains("function proxy"));
+    assert!(output.contains("target(1, 2)") || output.contains("target(1,2)"));
+    assert!(!output.contains("proxy(1, 2)"));
+}
+
+#[test]
+fn resolve_proxy_variables_rewrites_proxy_variable_identifier_uses() {
+    let input = "const proxy = target;\nproxy(1);\n";
+    let output = run(input);
+
+    assert!(output.contains("target(1)") || output.contains("target(1 )") || output.contains("target(1);"));
+    assert!(!output.contains("proxy(1)"));
+}
+
+#[test]
+fn resolve_proxy_variables_drops_unused_proxy_declarator() {
+    let input = "const proxy = target;\n";
+    let output = run(input);
+
+    assert!(!output.contains("const proxy"));
+}

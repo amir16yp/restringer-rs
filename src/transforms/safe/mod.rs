@@ -4,6 +4,8 @@ pub mod parse_template_literals_into_string_literals;
 pub mod rearrange_sequences;
 pub mod rearrange_switches;
 pub mod remove_redundant_block_statements;
+pub mod resolve_proxy_calls;
+pub mod resolve_proxy_variables;
 pub mod resolve_deterministic_if_statements;
 pub mod resolve_redundant_logical_expressions;
 pub mod separate_chained_declarators;

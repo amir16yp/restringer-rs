@@ -27,6 +27,8 @@ impl Default for Restringer {
                 Box::new(transforms::safe::rearrange_sequences::RearrangeSequences),
                 Box::new(transforms::safe::separate_chained_declarators::SeparateChainedDeclarators),
                 Box::new(transforms::safe::rearrange_switches::RearrangeSwitches),
+                Box::new(transforms::safe::resolve_proxy_variables::ResolveProxyVariables),
+                Box::new(transforms::safe::resolve_proxy_calls::ResolveProxyCalls),
                 Box::new(transforms::safe::normalize_computed::NormalizeComputed),
                 Box::new(transforms::safe::normalize_empty_statements::NormalizeEmptyStatements),
                 Box::new(transforms::safe::remove_redundant_block_statements::RemoveRedundantBlockStatements),
