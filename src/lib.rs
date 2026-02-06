@@ -48,6 +48,14 @@ impl Default for Restringer {
                 Box::new(
                     transforms::safe::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
                 ),
+                Box::new(transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
+                Box::new(transforms::safe::simplify_calls::SimplifyCalls),
+                Box::new(
+                    transforms::safe::replace_function_shells_with_wrapped_value::ReplaceFunctionShellsWithWrappedValue,
+                ),
+                Box::new(
+                    transforms::safe::replace_function_shells_with_wrapped_value_iife::ReplaceFunctionShellsWithWrappedValueIIFE,
+                ),
                 Box::new(transforms::safe::unwrap_function_shells::UnwrapFunctionShells),
                 Box::new(transforms::safe::unwrap_iifes::UnwrapIIFEs),
                 Box::new(transforms::safe::simplify_if_statements::SimplifyIfStatements),

@@ -237,3 +237,63 @@ fn resolve_member_expression_references_to_array_index_does_not_touch_assignment
     assert!(output.contains("arr[0] = 99") || output.contains("arr[0]=99"));
     assert!(output.contains("const x = 0") || output.contains("const x=0"));
 }
+
+#[test]
+fn simplify_calls_rewrites_call_this_to_direct_call() {
+    let input = "function f(a,b){return a+b;}\nf.call(this, 1, 2);\n";
+    let output = run(input);
+    // In the full safe pipeline this may further simplify to `1 + 2` via `unwrapSimpleOperations`.
+    assert!(
+        output.contains("f(1, 2)")
+            || output.contains("f(1,2)")
+            || output.contains("f(1 , 2)")
+            || output.contains("1 + 2")
+            || output.contains("1+2")
+    );
+    assert!(!output.contains(".call(this"));
+}
+
+#[test]
+fn simplify_calls_rewrites_apply_this_array_to_direct_call() {
+    let input = "function f(a,b){return a+b;}\nf.apply(this, [1, 2]);\n";
+    let output = run(input);
+    assert!(
+        output.contains("f(1, 2)") || output.contains("f(1,2)") || output.contains("1 + 2") || output.contains("1+2")
+    );
+    assert!(!output.contains(".apply(this"));
+}
+
+#[test]
+fn simplify_calls_keeps_non_this_context() {
+    let input = "function f(a){return a;}\nf.call(obj, 1);\n";
+    let output = run(input);
+    assert!(output.contains("f.call(obj") || output.contains(".call(obj"));
+}
+
+#[test]
+fn replace_function_shells_with_wrapped_value_replaces_calls_only() {
+    let input = "function a(){return 42;}\nconst x = a();\nconst y = a;\n";
+    let output = run(input);
+    assert!(output.contains("const x = 42") || output.contains("const x=42"));
+    // The reference `a` (not called) should remain.
+    assert!(output.contains("const y = a") || output.contains("const y=a"));
+}
+
+#[test]
+fn replace_function_shells_with_wrapped_value_iife_replaces_simple_iife() {
+    let input = "const x = (function(){ return 7; })();\n";
+    let output = run(input);
+    assert!(output.contains("const x = 7") || output.contains("const x=7"));
+    assert!(!output.contains("function(){"));
+    assert!(!output.contains(")();"));
+}
+
+#[test]
+fn resolve_function_constructor_calls_replaces_literal_constructor_call() {
+    let input = "const f = Function.constructor(\"a\", \"b\", \"return a + b;\");\nconst x = f(1, 2);\n";
+    let output = run(input);
+    // Should contain an actual function expression instead of `.constructor(...)`
+    assert!(!output.contains(".constructor("));
+    assert!(output.contains("function") || output.contains("=>"));
+    assert!(output.contains("return a + b") || output.contains("return a+b"));
+}
