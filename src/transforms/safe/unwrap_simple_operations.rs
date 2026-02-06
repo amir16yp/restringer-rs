@@ -172,30 +172,38 @@ impl<'a> VisitMut<'a> for Rewriter<'a> {
             if let Expression::Identifier(callee) = &call.callee {
                 if let Some(info) = self.map.get(callee.name.as_str()) {
                     if call.arguments.len() == info.arity {
-                        let mut args: Vec<Expression<'a>> = Vec::new();
-                        for a in &call.arguments {
-                            let Some(e) = a.as_expression() else {
-                                args.clear();
-                                break;
-                            };
-                            args.push(e.clone_in(self.allocator));
-                        }
+                        let span = call.span;
+                        let replacement = match info.kind {
+                            OpKind::Binary { operator } => {
+                                let Some(l) = call.arguments.get(0).and_then(|a| a.as_expression()) else {
+                                    return;
+                                };
+                                let Some(r) = call.arguments.get(1).and_then(|a| a.as_expression()) else {
+                                    return;
+                                };
+                                self.make_binary_expr(span, operator, l.clone_in(self.allocator), r.clone_in(self.allocator))
+                            }
+                            OpKind::Logical { operator } => {
+                                let Some(l) = call.arguments.get(0).and_then(|a| a.as_expression()) else {
+                                    return;
+                                };
+                                let Some(r) = call.arguments.get(1).and_then(|a| a.as_expression()) else {
+                                    return;
+                                };
+                                self.make_logical_expr(span, operator, l.clone_in(self.allocator), r.clone_in(self.allocator))
+                            }
+                            OpKind::Unary { operator } => {
+                                let idx = info.unary_param_index;
+                                let Some(arg) = call.arguments.get(idx).and_then(|a| a.as_expression()) else {
+                                    return;
+                                };
+                                self.make_unary_expr(span, operator, arg.clone_in(self.allocator))
+                            }
+                        };
 
-                        if args.len() == info.arity {
-                            let span = call.span;
-                            let replacement = match info.kind {
-                                OpKind::Binary { operator } => self.make_binary_expr(span, operator, args[0].clone_in(self.allocator), args[1].clone_in(self.allocator)),
-                                OpKind::Logical { operator } => self.make_logical_expr(span, operator, args[0].clone_in(self.allocator), args[1].clone_in(self.allocator)),
-                                OpKind::Unary { operator } => {
-                                    let idx = info.unary_param_index;
-                                    self.make_unary_expr(span, operator, args[idx].clone_in(self.allocator))
-                                }
-                            };
-
-                            *it = replacement;
-                            self.modified = true;
-                            return;
-                        }
+                        *it = replacement;
+                        self.modified = true;
+                        return;
                     }
                 }
             }

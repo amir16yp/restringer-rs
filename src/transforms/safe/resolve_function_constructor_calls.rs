@@ -1,4 +1,4 @@
-use oxc_allocator::{Box as ArenaBox, CloneIn};
+use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_parser::{ParseOptions, Parser};
@@ -68,8 +68,17 @@ impl<'a> Visitor<'a> {
     }
 
     fn parse_function_expression(&self, params: &str, body: &str) -> Option<Expression<'a>> {
-        let code = format!("(function ({}) {{{}}})", params, body);
-        let parse_ret = Parser::new(self.allocator, &code, self.source_type)
+        let mut code = String::with_capacity("(function () {})".len() + params.len() + body.len());
+        code.push_str("(function (");
+        code.push_str(params);
+        code.push_str(") {");
+        code.push_str(body);
+        code.push_str("})");
+
+        // IMPORTANT: parse into a temporary arena so allocations from this synthetic parse
+        // do not permanently grow the main deobfuscation arena.
+        let temp_allocator = Allocator::default();
+        let parse_ret = Parser::new(&temp_allocator, &code, self.source_type)
             .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
             .parse();
         if !parse_ret.errors.is_empty() {
@@ -101,15 +110,23 @@ impl<'a> Visitor<'a> {
         }
 
         // All args must be string literals.
-        let mut values: Vec<&str> = Vec::with_capacity(call.arguments.len());
-        for a in &call.arguments {
-            values.push(Self::literal_string(a)?);
+        // Avoid allocating a temporary Vec and an extra join buffer.
+        let last_index = call.arguments.len() - 1;
+        let mut params = String::new();
+        let mut body: Option<&'a str> = None;
+        for (i, a) in call.arguments.iter().enumerate() {
+            let s = Self::literal_string(a)?;
+            if i == last_index {
+                body = Some(s);
+            } else {
+                if !params.is_empty() {
+                    params.push_str(", ");
+                }
+                params.push_str(s);
+            }
         }
 
-        let body = values[values.len() - 1];
-        let params = if values.len() > 1 { values[..values.len() - 1].join(", ") } else { String::new() };
-
-        self.parse_function_expression(&params, body)
+        self.parse_function_expression(&params, body?)
     }
 
     fn boxed_expression(&self, expr: Expression<'a>) -> Expression<'a> {

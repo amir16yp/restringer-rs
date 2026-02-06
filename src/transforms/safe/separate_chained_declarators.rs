@@ -45,15 +45,15 @@ impl<'a> Visitor<'a> {
 
 impl<'a> VisitMut<'a> for Visitor<'a> {
     fn visit_program(&mut self, it: &mut Program<'a>) {
-        let original = it.body.clone_in(self.allocator);
+        let original = std::mem::replace(&mut it.body, ArenaVec::new_in(self.allocator));
         let mut new_body = ArenaVec::new_in(self.allocator);
 
-        for stmt in &original {
+        for stmt in original {
             match stmt {
                 Statement::VariableDeclaration(var_decl) => {
-                    self.split_var_decl_stmt(var_decl, &mut new_body);
+                    self.split_var_decl_stmt(&var_decl, &mut new_body);
                 }
-                _ => new_body.push(stmt.clone_in(self.allocator)),
+                other => new_body.push(other),
             }
         }
 
@@ -62,15 +62,15 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     }
 
     fn visit_block_statement(&mut self, it: &mut BlockStatement<'a>) {
-        let original = it.body.clone_in(self.allocator);
+        let original = std::mem::replace(&mut it.body, ArenaVec::new_in(self.allocator));
         let mut new_body = ArenaVec::new_in(self.allocator);
 
-        for stmt in &original {
+        for stmt in original {
             match stmt {
                 Statement::VariableDeclaration(var_decl) => {
-                    self.split_var_decl_stmt(var_decl, &mut new_body);
+                    self.split_var_decl_stmt(&var_decl, &mut new_body);
                 }
-                _ => new_body.push(stmt.clone_in(self.allocator)),
+                other => new_body.push(other),
             }
         }
 

@@ -99,12 +99,12 @@ impl<'a> Visitor<'a> {
     }
 
     fn unwrap_iife_in_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut out = ArenaVec::new_in(self.allocator);
 
-        for stmt in &original {
+        for stmt in original {
             let mut replaced = false;
-            if let Statement::ExpressionStatement(expr_stmt) = stmt {
+            if let Statement::ExpressionStatement(expr_stmt) = &stmt {
                 if let Expression::CallExpression(call) = self.unwrap_parens(&expr_stmt.expression) {
                     if let Some(body) = self.iife_statement_body(call) {
                         for s in body {
@@ -117,7 +117,7 @@ impl<'a> Visitor<'a> {
             }
 
             if !replaced {
-                out.push(stmt.clone_in(self.allocator));
+                out.push(stmt);
             }
         }
 

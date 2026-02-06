@@ -153,48 +153,58 @@ impl<'a> Visitor<'a> {
     }
 
     fn simplify_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let used = self.compute_used_names_in_statement_list(&original);
         let mut out = ArenaVec::new_in(self.allocator);
 
-        for stmt in &original {
-            if let Statement::VariableDeclaration(var_decl) = stmt {
-                let mut new_decl = (**var_decl).clone_in(self.allocator);
-                let original_decls = new_decl.declarations.clone_in(self.allocator);
-                let mut kept = ArenaVec::new_in(self.allocator);
+        for stmt in original {
+            match stmt {
+                Statement::VariableDeclaration(var_decl) => {
+                    let mut any_dropped = false;
+                    let mut kept = ArenaVec::new_in(self.allocator);
 
-                for d in &original_decls {
-                    let BindingPattern::BindingIdentifier(binding) = &d.id else {
-                        kept.push(d.clone_in(self.allocator));
-                        continue;
-                    };
-                    let proxy_name = binding.name.as_str();
+                    for d in &var_decl.declarations {
+                        let BindingPattern::BindingIdentifier(binding) = &d.id else {
+                            kept.push(d.clone_in(self.allocator));
+                            continue;
+                        };
+                        let proxy_name = binding.name.as_str();
 
-                    // Drop `const proxy = target;` if proxy is unused in this statement list.
-                    // This is local and conservative: it covers typical obfuscation patterns and your test.
-                    if let Some(init) = d.init.as_ref() {
-                        if let Expression::Identifier(_) = init {
-                            if !used.contains(proxy_name) {
-                                self.modified = true;
-                                continue;
+                        // Drop `const proxy = target;` if proxy is unused in this statement list.
+                        // This is local and conservative: it covers typical obfuscation patterns and your test.
+                        if let Some(init) = d.init.as_ref() {
+                            if let Expression::Identifier(_) = init {
+                                if !used.contains(proxy_name) {
+                                    any_dropped = true;
+                                    self.modified = true;
+                                    continue;
+                                }
                             }
                         }
+
+                        kept.push(d.clone_in(self.allocator));
                     }
 
-                    kept.push(d.clone_in(self.allocator));
-                }
+                    if !any_dropped {
+                        // No semantic change; keep the original statement without cloning the AST.
+                        out.push(Statement::VariableDeclaration(var_decl));
+                        continue;
+                    }
 
-                new_decl.declarations = kept;
-                if new_decl.declarations.is_empty() {
-                    self.modified = true;
-                    continue;
-                }
+                    if kept.is_empty() {
+                        self.modified = true;
+                        continue;
+                    }
 
-                out.push(Statement::VariableDeclaration(oxc_allocator::Box::new_in(new_decl, self.allocator)));
-                continue;
+                    let mut new_decl = (*var_decl).clone_in(self.allocator);
+                    new_decl.declarations = kept;
+                    out.push(Statement::VariableDeclaration(oxc_allocator::Box::new_in(new_decl, self.allocator)));
+                }
+                other => {
+                    // Keep the original statement without cloning the AST.
+                    out.push(other);
+                }
             }
-
-            out.push(stmt.clone_in(self.allocator));
         }
 
         *stmts = out;

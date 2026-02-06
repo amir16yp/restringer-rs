@@ -40,15 +40,15 @@ impl<'a> Visitor<'a> {
         ))
     }
 
-    fn simplify_statement(&mut self, stmt: &Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
-        if let Statement::IfStatement(if_stmt) = stmt {
+    fn simplify_statement(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+        if let Statement::IfStatement(if_stmt) = &stmt {
             let consequent_empty = is_empty(&if_stmt.consequent);
             let alternate_empty = if_stmt.alternate.as_ref().is_none_or(is_empty);
 
             if consequent_empty {
                 if alternate_empty {
                     if if_stmt.alternate.is_some() {
-                        out.push(stmt.clone_in(self.allocator));
+                        out.push(stmt);
                         return;
                     }
                     // if (test) ; else ;  => test;
@@ -85,13 +85,13 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        out.push(stmt.clone_in(self.allocator));
+        out.push(stmt);
     }
 
     fn simplify_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut new_body = ArenaVec::new_in(self.allocator);
-        for stmt in &original {
+        for stmt in original {
             self.simplify_statement(stmt, &mut new_body);
         }
         *stmts = new_body;

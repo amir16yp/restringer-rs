@@ -102,8 +102,8 @@ fn deterministic_truthiness(expr: &Expression<'_>) -> Option<bool> {
 }
 
 impl<'a> Visitor<'a> {
-    fn simplify_statement(&mut self, stmt: &Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
-        if let Statement::IfStatement(if_stmt) = stmt {
+    fn simplify_statement(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+        if let Statement::IfStatement(if_stmt) = &stmt {
             if let Some(test_truthy) = deterministic_truthiness(&if_stmt.test) {
                 let replacement = if test_truthy {
                     Some(if_stmt.consequent.clone_in(self.allocator))
@@ -120,13 +120,13 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        out.push(stmt.clone_in(self.allocator));
+        out.push(stmt);
     }
 
     fn simplify_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut new_body = ArenaVec::new_in(self.allocator);
-        for stmt in &original {
+        for stmt in original {
             self.simplify_statement(stmt, &mut new_body);
         }
         *stmts = new_body;

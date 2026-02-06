@@ -2,6 +2,7 @@ use std::{
     ffi::OsStr,
     ffi::OsString,
     fs,
+    io::Read,
     path::{Path, PathBuf},
     process,
 };
@@ -52,7 +53,7 @@ fn main() {
     }
 
     let input_path = cli.input_filename;
-    let source_text = match fs::read_to_string(&input_path) {
+    let source_text = match read_file_to_string_with_capacity(&input_path) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("[-] Critical Error: Failed to read {}: {e}", input_path.display());
@@ -118,6 +119,14 @@ fn main() {
     } else {
         print!("{output_text}");
     }
+}
+
+fn read_file_to_string_with_capacity(path: &Path) -> std::io::Result<String> {
+    let mut file = fs::File::open(path)?;
+    let cap = file.metadata().ok().and_then(|m| usize::try_from(m.len()).ok()).unwrap_or(0);
+    let mut s = String::with_capacity(cap.saturating_add(1));
+    file.read_to_string(&mut s)?;
+    Ok(s)
 }
 
 fn resolve_output_path(input_path: &Path, output: Option<&OsStr>) -> PathBuf {

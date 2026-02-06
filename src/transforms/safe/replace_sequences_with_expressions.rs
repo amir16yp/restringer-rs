@@ -39,8 +39,8 @@ impl<'a> Visitor<'a> {
         out
     }
 
-    fn transform_statement_in_list(&mut self, stmt: &Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
-        if let Statement::ExpressionStatement(expr_stmt) = stmt {
+    fn transform_statement_in_list(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+        if let Statement::ExpressionStatement(expr_stmt) = &stmt {
             if let Expression::SequenceExpression(seq) = &expr_stmt.expression {
                 if seq.expressions.len() > 1 {
                     let expanded = self.seq_to_expression_statements(expr_stmt.span, seq);
@@ -53,13 +53,13 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        out.push(stmt.clone_in(self.allocator));
+        out.push(stmt);
     }
 
     fn transform_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut out = ArenaVec::new_in(self.allocator);
-        for stmt in &original {
+        for stmt in original {
             self.transform_statement_in_list(stmt, &mut out);
         }
         *stmts = out;

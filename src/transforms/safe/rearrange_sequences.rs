@@ -47,7 +47,7 @@ impl<'a> Visitor<'a> {
         (extracted, last_expr)
     }
 
-    fn transform_statement_in_list(&mut self, stmt: &Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+    fn transform_statement_in_list(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
         match stmt {
             Statement::ReturnStatement(ret) => {
                 if let Some(Expression::SequenceExpression(seq)) = ret.argument.as_ref() {
@@ -55,12 +55,13 @@ impl<'a> Visitor<'a> {
                     for s in extracted.drain(..) {
                         out.push(s);
                     }
-                    let mut new_ret = ret.clone_in(self.allocator);
+                    let mut new_ret = (*ret).clone_in(self.allocator);
                     new_ret.argument = Some(last_expr);
-                    out.push(Statement::ReturnStatement(new_ret));
+                    out.push(Statement::ReturnStatement(ArenaBox::new_in(new_ret, self.allocator)));
                     self.modified = true;
                     return;
                 }
+                out.push(Statement::ReturnStatement(ret));
             }
             Statement::IfStatement(if_stmt) => {
                 if let Expression::SequenceExpression(seq) = &if_stmt.test {
@@ -68,25 +69,26 @@ impl<'a> Visitor<'a> {
                     for s in extracted.drain(..) {
                         out.push(s);
                     }
-                    let mut new_if = if_stmt.clone_in(self.allocator);
+                    let mut new_if = (*if_stmt).clone_in(self.allocator);
                     new_if.test = last_expr;
-                    out.push(Statement::IfStatement(new_if));
+                    out.push(Statement::IfStatement(ArenaBox::new_in(new_if, self.allocator)));
                     self.modified = true;
                     return;
                 }
+                out.push(Statement::IfStatement(if_stmt));
             }
-            _ => {}
+            other => {
+                out.push(other);
+            }
         }
-
-        out.push(stmt.clone_in(self.allocator));
     }
 }
 
 impl<'a> VisitMut<'a> for Visitor<'a> {
     fn visit_program(&mut self, it: &mut Program<'a>) {
-        let original = it.body.clone_in(self.allocator);
+        let original = std::mem::replace(&mut it.body, ArenaVec::new_in(self.allocator));
         let mut new_body = ArenaVec::new_in(self.allocator);
-        for stmt in &original {
+        for stmt in original {
             self.transform_statement_in_list(stmt, &mut new_body);
         }
         it.body = new_body;
@@ -94,9 +96,9 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     }
 
     fn visit_function_body(&mut self, it: &mut FunctionBody<'a>) {
-        let original = it.statements.clone_in(self.allocator);
+        let original = std::mem::replace(&mut it.statements, ArenaVec::new_in(self.allocator));
         let mut new_body = ArenaVec::new_in(self.allocator);
-        for stmt in &original {
+        for stmt in original {
             self.transform_statement_in_list(stmt, &mut new_body);
         }
         it.statements = new_body;
@@ -104,9 +106,9 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     }
 
     fn visit_block_statement(&mut self, it: &mut BlockStatement<'a>) {
-        let original = it.body.clone_in(self.allocator);
+        let original = std::mem::replace(&mut it.body, ArenaVec::new_in(self.allocator));
         let mut new_body = ArenaVec::new_in(self.allocator);
-        for stmt in &original {
+        for stmt in original {
             self.transform_statement_in_list(stmt, &mut new_body);
         }
         it.body = new_body;
