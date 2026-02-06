@@ -1,0 +1,14 @@
+[package]
+name = "restringer-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ clap = { version = "4.5.28", features = ["derive"] }
+ oxc_allocator = "0.108.0"
+ oxc_ast = "0.108.0"
+ oxc_ast_visit = "0.108.0"
+ oxc_codegen = "0.108.0"
+ oxc_parser = "0.108.0"
+ oxc_span = "0.108.0"
+ oxc_syntax = "0.108.0"

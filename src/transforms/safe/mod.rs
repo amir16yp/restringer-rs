@@ -1,0 +1,12 @@
+pub mod normalize_empty_statements;
+pub mod normalize_computed;
+pub mod parse_template_literals_into_string_literals;
+pub mod rearrange_sequences;
+pub mod rearrange_switches;
+pub mod remove_redundant_block_statements;
+pub mod resolve_redundant_logical_expressions;
+pub mod separate_chained_declarators;
+pub mod simplify_if_statements;
+pub mod unwrap_simple_operations;
+pub mod unwrap_iifes;
+pub mod unwrap_function_shells;
