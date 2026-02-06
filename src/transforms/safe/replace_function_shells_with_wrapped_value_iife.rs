@@ -65,12 +65,12 @@ impl<'a> Visitor<'a> {
     }
 
     fn simplify_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut out = ArenaVec::new_in(self.allocator);
 
-        for stmt in &original {
+        for stmt in original {
             let mut replaced = false;
-            if let Statement::ExpressionStatement(es) = stmt {
+            if let Statement::ExpressionStatement(es) = &stmt {
                 if let Expression::CallExpression(call) = self.unwrap_parens(&es.expression) {
                     if let Some(rep) = self.returnable_from_iife(call) {
                         // Replace the entire call expression in-place.
@@ -84,7 +84,7 @@ impl<'a> Visitor<'a> {
             }
 
             if !replaced {
-                out.push(stmt.clone_in(self.allocator));
+                out.push(stmt);
             }
         }
 

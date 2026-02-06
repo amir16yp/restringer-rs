@@ -142,32 +142,48 @@ impl<'a> Visitor<'a> {
     }
 
     fn transform_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut out = ArenaVec::new_in(self.allocator);
 
-        let mut i = 0usize;
-        while i < original.len() {
-            if i + 1 < original.len() {
-                if let Some((state_name, init_val)) = self.extract_state_var_init(&original[i]) {
-                    if let Some(sw_ident) = self.switch_discriminant_ident(&original[i + 1]) {
+        let mut it = original.into_iter().peekable();
+        while let Some(stmt) = it.next() {
+            let try_rewrite = if let Some(next) = it.peek() {
+                if let Some((state_name, init_val)) = self.extract_state_var_init(&stmt) {
+                    if let Some(sw_ident) = self.switch_discriminant_ident(next) {
                         if sw_ident == state_name {
-                            if let Statement::SwitchStatement(sw) = &original[i + 1] {
+                            if let Statement::SwitchStatement(sw) = next {
                                 if let Some(ordered) = self.linearize_switch(sw, state_name, init_val) {
                                     for s in ordered {
                                         out.push(s);
                                     }
                                     self.modified = true;
-                                    i += 2;
-                                    continue;
+                                    true
+                                } else {
+                                    false
                                 }
+                            } else {
+                                false
                             }
+                        } else {
+                            false
                         }
+                    } else {
+                        false
                     }
+                } else {
+                    false
                 }
+            } else {
+                false
+            };
+
+            if try_rewrite {
+                // consume the switch statement
+                let _ = it.next();
+                continue;
             }
 
-            out.push(original[i].clone_in(self.allocator));
-            i += 1;
+            out.push(stmt);
         }
 
         *stmts = out;

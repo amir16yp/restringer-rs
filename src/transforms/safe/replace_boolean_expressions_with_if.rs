@@ -35,8 +35,8 @@ impl<'a> Visitor<'a> {
         ))
     }
 
-    fn transform_statement(&mut self, stmt: &Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
-        if let Statement::ExpressionStatement(expr_stmt) = stmt {
+    fn transform_statement(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+        if let Statement::ExpressionStatement(expr_stmt) = &stmt {
             if let Expression::LogicalExpression(logical) = &expr_stmt.expression {
                 if matches!(logical.operator, oxc_syntax::operator::LogicalOperator::And | oxc_syntax::operator::LogicalOperator::Or)
                 {
@@ -78,13 +78,13 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        out.push(stmt.clone_in(self.allocator));
+        out.push(stmt);
     }
 
     fn transform_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        let original = stmts.clone_in(self.allocator);
+        let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut out = ArenaVec::new_in(self.allocator);
-        for stmt in &original {
+        for stmt in original {
             self.transform_statement(stmt, &mut out);
         }
         *stmts = out;

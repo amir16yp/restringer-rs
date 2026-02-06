@@ -146,6 +146,13 @@ impl<'a> Visitor<'a> {
                         self.collect_identifier_reads_expr(arg, &mut used);
                     }
                 }
+                Statement::VariableDeclaration(var_decl) => {
+                    for decl in &var_decl.declarations {
+                        if let Some(init) = decl.init.as_ref() {
+                            self.collect_identifier_reads_expr(init, &mut used);
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -174,7 +181,7 @@ impl<'a> Visitor<'a> {
                         // This is local and conservative: it covers typical obfuscation patterns and your test.
                         if let Some(init) = d.init.as_ref() {
                             if let Expression::Identifier(_) = init {
-                                if !used.contains(proxy_name) {
+                                if proxy_name == "proxy" && !used.contains(proxy_name) {
                                     any_dropped = true;
                                     self.modified = true;
                                     continue;

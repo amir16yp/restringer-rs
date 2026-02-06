@@ -64,21 +64,27 @@ impl<'a> Visitor<'a> {
 
             // Walk statements again to replace `name()` calls within this list.
             // This is conservative: same statement list scope only.
-            let original = stmts.clone_in(self.allocator);
-            let mut out = ArenaVec::new_in(self.allocator);
-
-            for s in &original {
-                out.push(self.replace_calls_in_statement(span_name, &ret_clone, s));
+            let mut replaced_any = false;
+            for s in stmts.iter_mut() {
+                if self.replace_calls_in_statement_in_place(span_name, &ret_clone, s) {
+                    replaced_any = true;
+                }
             }
 
-            *stmts = out;
-            self.modified = true;
+            if replaced_any {
+                self.modified = true;
+            }
             // Only do one function shell per pass in this list to avoid quadratic blowups.
             break;
         }
     }
 
-    fn replace_calls_in_statement(&self, func_name: &str, replacement: &Expression<'a>, stmt: &Statement<'a>) -> Statement<'a> {
+    fn replace_calls_in_statement_in_place(
+        &self,
+        func_name: &str,
+        replacement: &Expression<'a>,
+        stmt: &mut Statement<'a>,
+    ) -> bool {
         struct Replacer<'a, 'b> {
             allocator: &'a oxc_allocator::Allocator,
             func_name: &'b str,
@@ -114,10 +120,9 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        let mut cloned = stmt.clone_in(self.allocator);
         let mut r = Replacer { allocator: self.allocator, func_name, replacement, replaced_any: false };
-        r.visit_statement(&mut cloned);
-        cloned
+        r.visit_statement(stmt);
+        r.replaced_any
     }
 }
 
