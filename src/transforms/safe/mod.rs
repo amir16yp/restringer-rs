@@ -12,6 +12,8 @@ pub mod resolve_member_expression_references_to_array_index;
 pub mod resolve_redundant_logical_expressions;
 pub mod separate_chained_declarators;
 pub mod simplify_if_statements;
+pub mod replace_boolean_expressions_with_if;
+pub mod replace_sequences_with_expressions;
 pub mod unwrap_simple_operations;
 pub mod unwrap_iifes;
 pub mod unwrap_function_shells;

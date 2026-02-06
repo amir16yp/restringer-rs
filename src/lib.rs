@@ -42,6 +42,12 @@ impl Default for Restringer {
                     transforms::safe::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
                 ),
                 Box::new(transforms::safe::resolve_deterministic_if_statements::ResolveDeterministicIfStatements),
+                Box::new(
+                    transforms::safe::replace_boolean_expressions_with_if::ReplaceBooleanExpressionsWithIf,
+                ),
+                Box::new(
+                    transforms::safe::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
+                ),
                 Box::new(transforms::safe::unwrap_function_shells::UnwrapFunctionShells),
                 Box::new(transforms::safe::unwrap_iifes::UnwrapIIFEs),
                 Box::new(transforms::safe::simplify_if_statements::SimplifyIfStatements),
