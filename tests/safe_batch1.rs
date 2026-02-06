@@ -7,6 +7,7 @@ fn run(input: &str) -> String {
             input,
             DeobfuscateOptions {
                 source_type: Some(oxc_span::SourceType::mjs()),
+                max_iterations: Some(1),
                 ..DeobfuscateOptions::default()
             },
         )
