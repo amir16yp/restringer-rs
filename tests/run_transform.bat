@@ -5,10 +5,44 @@ REM Run from crate root
 set "ROOT=%~dp0.."
 pushd "%ROOT%" || exit /b 1
 
+REM Optional arg: URL or local path to a JS file.
+REM If omitted, defaults to Minecraft Classic Reversed app.js.
+set "SOURCE=%~1"
+if /I "%SOURCE%"=="-h" goto :usage
+if /I "%SOURCE%"=="--help" goto :usage
+if "%SOURCE%"=="" (
+  set "SOURCE=https://github.com/TheSunCat/Minecraft-Classic-Reversed/raw/refs/heads/master/assets/js/app.js"
+)
+
 set "INPUT=tests\app.js"
 set "DEOBF=tests\app_deobf.js"
 set "DEOBF_PRETTY=tests\app_deobf_pretty.js"
 set "DIFF_OUT=tests\transform.diff"
+
+REM 0) Materialize input (download URL or copy local file) into tests\app.js
+echo(%SOURCE% | findstr /I /B /C:"http://" /C:"https://" >nul
+if not errorlevel 1 (
+  echo [+] Downloading %SOURCE%
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "try { iwr -UseBasicParsing -Uri '%SOURCE%' -OutFile '%INPUT%' } catch { exit 1 }"
+  if errorlevel 1 (
+    echo [-] Download failed: %SOURCE%
+    popd
+    exit /b 1
+  )
+) else (
+  if not exist "%SOURCE%" (
+    echo [-] Input file not found: %SOURCE%
+    popd
+    exit /b 1
+  )
+  echo [+] Copying %SOURCE% to %INPUT%
+  copy /Y "%SOURCE%" "%INPUT%" >nul
+  if errorlevel 1 (
+    echo [-] Copy failed: %SOURCE%
+    popd
+    exit /b 1
+  )
+)
 
 REM 1) Prettify input in-place
 call npx prettier --write "%INPUT%"
@@ -51,5 +85,14 @@ echo     Deobfuscated:     %DEOBF%
 echo     Pretty deobf:     %DEOBF_PRETTY%
 echo     Diff written:    %DIFF_OUT%
 
+popd
+exit /b 0
+
+:usage
+echo Usage:
+echo     %~nx0 [URL^|PATH]
+echo.
+echo If omitted, defaults to:
+echo     https://github.com/TheSunCat/Minecraft-Classic-Reversed/raw/refs/heads/master/assets/js/app.js
 popd
 exit /b 0
