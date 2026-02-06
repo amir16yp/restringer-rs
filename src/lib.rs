@@ -35,6 +35,7 @@ impl Default for Restringer {
                 Box::new(
                     transforms::safe::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
                 ),
+                Box::new(transforms::safe::resolve_deterministic_if_statements::ResolveDeterministicIfStatements),
                 Box::new(transforms::safe::unwrap_function_shells::UnwrapFunctionShells),
                 Box::new(transforms::safe::unwrap_iifes::UnwrapIIFEs),
                 Box::new(transforms::safe::simplify_if_statements::SimplifyIfStatements),

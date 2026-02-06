@@ -73,9 +73,12 @@ fn resolve_redundant_logical_expressions_simplifies_if_test() {
     let input = "if (false && foo()) { a(); }\nif (true || bar()) { b(); }\n";
     let output = run(input);
 
-    // false && foo() => false; true || bar() => true
-    assert!(output.contains("if (false)"));
-    assert!(output.contains("if (true)"));
+    // false && foo() => false (then eliminated by resolveDeterministicIfStatements)
+    // true || bar() => true (then reduced to its consequent)
+    assert!(output.contains("b();"));
+    assert!(!output.contains("a();"));
+    assert!(!output.contains("foo()"));
+    assert!(!output.contains("bar()"));
 }
 
 #[test]
@@ -96,6 +99,24 @@ fn normalize_computed_converts_bracket_string_member_access_to_dot() {
     let input = "console['log'](1);\n";
     let output = run(input);
     assert!(output.contains("console.log"));
+}
+
+#[test]
+fn resolve_deterministic_if_statements_resolves_literal_and_unary_conditions() {
+    let input = "if (true) a(); else b();\nif (0) c(); else d();\nif (!0) e();\nif (undefined) f();\n";
+    let output = run(input);
+
+    assert!(output.contains("a();"));
+    assert!(!output.contains("b();"));
+
+    assert!(output.contains("d();"));
+    assert!(!output.contains("c();"));
+
+    assert!(output.contains("e();"));
+
+    // if (undefined) f(); should be removed entirely.
+    assert!(!output.contains("f();"));
+    assert!(!output.contains("if (undefined)"));
 }
 
 #[test]
