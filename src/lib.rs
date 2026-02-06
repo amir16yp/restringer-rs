@@ -165,8 +165,8 @@ impl Restringer {
             if !self.safe_transforms.is_empty() {
                 for _ in 0..max_iterations {
                     let mut modified_iter = false;
+                    let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                     for t in &self.safe_transforms {
-                        let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                         if t.run(&mut ctx, &mut program) {
                             modified_iter = true;
                         }
@@ -183,8 +183,8 @@ impl Restringer {
             // Phase 2: apply unsafe transforms exactly once.
             if opts.run_unsafe && !self.unsafe_transforms.is_empty() {
                 let mut modified_iter = false;
+                let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                 for t in &self.unsafe_transforms {
-                    let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                     if t.run(&mut ctx, &mut program) {
                         modified_iter = true;
                     }
