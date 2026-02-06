@@ -200,3 +200,40 @@ fn resolve_proxy_variables_drops_unused_proxy_declarator() {
 
     assert!(!output.contains("const proxy"));
 }
+
+#[test]
+fn resolve_proxy_references_rewrites_proxy_identifier_uses_to_member_expression() {
+    let input = "const obj = { a: 1 };\nconst proxy = obj.a;\nconsole.log(proxy);\n";
+    let output = run(input);
+
+    assert!(output.contains("console.log(obj.a)") || output.contains("console.log(obj.a);") || output.contains("console.log(obj.a )"));
+    assert!(!output.contains("console.log(proxy"));
+}
+
+#[test]
+fn resolve_member_expression_references_to_array_index_replaces_large_array_index_reads() {
+    let input = "const arr = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];\nconst x = arr[0];\nconst y = arr[21];\n";
+    let output = run(input);
+
+    assert!(output.contains("const x = 0") || output.contains("const x=0"));
+    assert!(output.contains("const y = 21") || output.contains("const y=21"));
+    assert!(!output.contains("arr[0]"));
+    assert!(!output.contains("arr[21]"));
+}
+
+#[test]
+fn resolve_member_expression_references_to_array_index_skips_small_arrays() {
+    let input = "const arr = [0,1,2];\nconst x = arr[0];\n";
+    let output = run(input);
+
+    assert!(output.contains("arr[0]"));
+}
+
+#[test]
+fn resolve_member_expression_references_to_array_index_does_not_touch_assignment_lhs() {
+    let input = "const arr = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];\narr[0] = 99;\nconst x = arr[0];\n";
+    let output = run(input);
+
+    assert!(output.contains("arr[0] = 99") || output.contains("arr[0]=99"));
+    assert!(output.contains("const x = 0") || output.contains("const x=0"));
+}
