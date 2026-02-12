@@ -16,6 +16,7 @@ pub mod resolve_proxy_references;
 pub mod resolve_proxy_variables;
 pub mod resolve_deterministic_if_statements;
 pub mod resolve_member_expression_references_to_array_index;
+pub mod resolve_member_expressions_with_direct_assignment;
 pub mod resolve_redundant_logical_expressions;
 pub mod separate_chained_declarators;
 pub mod simplify_if_statements;

@@ -15,7 +15,13 @@ impl Transform for ReplaceIdentifierWithFixedAssignedValue {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, map: HashMap::new(), modified: false, in_object_shorthand: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            map: HashMap::new(),
+            modified: false,
+            in_object_shorthand: false,
+            in_computed_member_property: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -29,6 +35,10 @@ struct Visitor<'a> {
     // When visiting `{ a }` shorthand, OXC represents value as an Identifier expression.
     // Replacing it would change object structure (`{ a: 3 }`). Keep conservative.
     in_object_shorthand: bool,
+    // Conservative: do not inline identifiers used as computed member keys: `obj[key]`.
+    // This matches the JS transform's behavior which only resolves computed access when
+    // the property is a direct literal.
+    in_computed_member_property: bool,
 }
 
 impl<'a> Visitor<'a> {
@@ -256,7 +266,7 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'a>) {
-        if !self.in_object_shorthand {
+        if !self.in_object_shorthand && !self.in_computed_member_property {
             if let Expression::Identifier(idref) = it {
                 if let Some(replacement) = self.map.get(idref.name.as_str()) {
                     let span = idref.span;
@@ -274,6 +284,15 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
         }
 
         oxc_ast_visit::walk_mut::walk_expression(self, it);
+    }
+
+    fn visit_computed_member_expression(&mut self, it: &mut ComputedMemberExpression<'a>) {
+        // Walk object normally; but don't replace identifiers used as computed keys.
+        self.visit_expression(&mut it.object);
+        let prev = self.in_computed_member_property;
+        self.in_computed_member_property = true;
+        self.visit_expression(&mut it.expression);
+        self.in_computed_member_property = prev;
     }
 
     fn visit_binding_identifier(&mut self, it: &mut BindingIdentifier<'a>) {

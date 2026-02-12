@@ -417,3 +417,28 @@ fn replace_identifier_with_fixed_assigned_value_does_not_replace_object_shorthan
     let output = run(input);
     assert!(output.contains("{ a }") || output.contains("{a}"));
 }
+
+#[test]
+fn resolve_member_expressions_with_direct_assignment_replaces_reads_with_literal() {
+    let input = "function a() {} a.b = 3; a.c = '5'; console.log(a.b + a.c);\n";
+    let output = run(input);
+    assert!(output.contains("a.b = 3"));
+    assert!(output.contains("a.c = '5'") || output.contains("a.c = \"5\""));
+    assert!(output.contains("console.log(3 + '5')") || output.contains("console.log(3 + \"5\")"));
+}
+
+#[test]
+fn resolve_member_expressions_with_direct_assignment_does_not_replace_when_property_is_updated() {
+    let input = "const a = {}; a.b = 3; a.b++; console.log(a.b);\n";
+    let output = run(input);
+    assert!(output.contains("a.b++") || output.contains("a.b ++"));
+    assert!(output.contains("console.log(a.b") || output.contains("console.log(a.b)"));
+}
+
+#[test]
+fn resolve_member_expressions_with_direct_assignment_does_not_replace_non_literal_computed_property() {
+    let input = "const a = {}; const k = 'b'; a[k] = 3; console.log(a[k]);\n";
+    let output = run(input);
+    assert!(output.contains("a[k] = 3") || output.contains("a[k]=3"));
+    assert!(output.contains("console.log(a[k])") || output.contains("console.log(a[k])"));
+}

@@ -33,6 +33,9 @@ impl Default for Restringer {
                 Box::new(
                     transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
                 ),
+                Box::new(
+                    transforms::safe::resolve_member_expressions_with_direct_assignment::ResolveMemberExpressionsWithDirectAssignment,
+                ),
                 Box::new(transforms::safe::normalize_computed::NormalizeComputed),
                 Box::new(transforms::safe::normalize_empty_statements::NormalizeEmptyStatements),
                 Box::new(transforms::safe::remove_redundant_block_statements::RemoveRedundantBlockStatements),
