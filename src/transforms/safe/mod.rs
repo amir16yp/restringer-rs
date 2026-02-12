@@ -5,6 +5,9 @@ pub mod rearrange_sequences;
 pub mod rearrange_switches;
 pub mod remove_redundant_block_statements;
 pub mod simplify_calls;
+pub mod replace_call_expressions_with_unwrapped_identifier;
+pub mod replace_eval_calls_with_literal_content;
+pub mod replace_new_func_calls_with_literal_content;
 pub mod replace_function_shells_with_wrapped_value;
 pub mod replace_function_shells_with_wrapped_value_iife;
 pub mod resolve_function_constructor_calls;
@@ -21,3 +24,5 @@ pub mod replace_sequences_with_expressions;
 pub mod unwrap_simple_operations;
 pub mod unwrap_iifes;
 pub mod unwrap_function_shells;
+
+pub mod replace_identifier_with_fixed_assigned_value;

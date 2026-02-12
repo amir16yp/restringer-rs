@@ -272,6 +272,80 @@ fn simplify_calls_keeps_non_this_context() {
 }
 
 #[test]
+fn replace_call_expressions_with_unwrapped_identifier_unwraps_function_returning_identifier() {
+    let input = "function a() { return String; }\na()('x');\n";
+    let output = run(input);
+    assert!(output.contains("String('x')") || output.contains("String(\"x\")"));
+    assert!(!output.contains("a()('x')"));
+}
+
+#[test]
+fn replace_call_expressions_with_unwrapped_identifier_unwraps_var_arrow_returning_identifier() {
+    let input = "const b = () => btoa;\nb()('data');\n";
+    let output = run(input);
+    assert!(output.contains("btoa('data')") || output.contains("btoa(\"data\")"));
+    assert!(!output.contains("b()('data')"));
+}
+
+#[test]
+fn replace_call_expressions_with_unwrapped_identifier_unwraps_function_returning_parameterless_call() {
+    let input = "function g() { return h; }\nfunction wrap() { return g(); }\nwrap()();\n";
+    let output = run(input);
+    assert!(!output.contains("wrap()();"));
+    assert!(output.contains("g()()") || output.contains("h()") || output.contains("h();"));
+}
+
+#[test]
+fn replace_eval_calls_with_literal_content_replaces_eval_expression() {
+    let input = "console.log(eval('1 + 2'));\n";
+    let output = run(input);
+    assert!(!output.contains("eval("));
+    assert!(output.contains("console.log(1 + 2)") || output.contains("console.log(1+2)"));
+}
+
+#[test]
+fn replace_eval_calls_with_literal_content_replaces_eval_statement_with_block() {
+    let input = "eval('a(); b();');\n";
+    let output = run(input);
+    assert!(!output.contains("eval("));
+    assert!(output.contains("a();"));
+    assert!(output.contains("b();"));
+}
+
+#[test]
+fn replace_eval_calls_with_literal_content_handles_eval_as_callee() {
+    let input = "eval('Function')('return 7;')();\n";
+    let output = run(input);
+    assert!(!output.contains("eval("));
+    assert!(output.contains("Function(") || output.contains("function"));
+}
+
+#[test]
+fn replace_new_func_calls_with_literal_content_replaces_expression() {
+    let input = "const x = new Function('return 7')();\n";
+    let output = run(input);
+    assert!(!output.contains("new Function"));
+    assert!(output.contains("const x = 7") || output.contains("const x=7"));
+}
+
+#[test]
+fn replace_new_func_calls_with_literal_content_replaces_multiple_statements_with_block() {
+    let input = "new Function('a(); b();')();\n";
+    let output = run(input);
+    assert!(!output.contains("new Function"));
+    assert!(output.contains("a();"));
+    assert!(output.contains("b();"));
+}
+
+#[test]
+fn replace_new_func_calls_with_literal_content_replaces_expression_code_in_expression_context() {
+    let input = "console.log(new Function('1 + 2')());\n";
+    let output = run(input);
+    assert!(!output.contains("new Function"));
+    assert!(output.contains("console.log(1 + 2)") || output.contains("console.log(1+2)"));
+}
+
+#[test]
 fn replace_function_shells_with_wrapped_value_replaces_calls_only() {
     let input = "function a(){return 42;}\nconst x = a();\nconst y = a;\n";
     let output = run(input);
@@ -297,4 +371,49 @@ fn resolve_function_constructor_calls_replaces_literal_constructor_call() {
     assert!(!output.contains(".constructor("));
     assert!(output.contains("function") || output.contains("=>"));
     assert!(output.contains("return a + b") || output.contains("return a+b"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_replaces_number_literal_references() {
+    let input = "const a = 3; const b = a * 2; console.log(b + a);\n";
+    let output = run(input);
+    assert!(output.contains("const a = 3") || output.contains("const a=3"));
+    assert!(output.contains("const b = 3 * 2") || output.contains("const b=3*2") || output.contains("const b=3 * 2"));
+    assert!(output.contains("console.log(b + 3)") || output.contains("console.log(b+3)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_replaces_string_literal_references() {
+    let input = "const msg = 'hello'; console.log(msg + ' world');\n";
+    let output = run(input);
+    assert!(output.contains("const msg"));
+    assert!(
+        output.contains("console.log('hello' + ' world')")
+            || output.contains("console.log('hello'+' world')")
+            || output.contains("console.log(\"hello\" + \" world\")")
+            || output.contains("console.log(\"hello\"+\" world\")")
+    );
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_does_not_replace_modified_variable() {
+    let input = "let counter = 0; counter++; console.log(counter);\n";
+    let output = run(input);
+    assert!(output.contains("counter++") || output.contains("counter ++"));
+    assert!(output.contains("console.log(counter)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_does_not_replace_for_in_loop_lhs() {
+    let input = "var a = 3; for (a in [1, 2]) console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("for (a in") || output.contains("for(a in"));
+    assert!(output.contains("console.log(a)") || output.contains("console.log(a);"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_does_not_replace_object_shorthand() {
+    let input = "const a = 3; const obj = { a }; console.log(obj.a);\n";
+    let output = run(input);
+    assert!(output.contains("{ a }") || output.contains("{a}"));
 }

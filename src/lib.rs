@@ -51,6 +51,18 @@ impl Default for Restringer {
                 Box::new(transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
                 Box::new(transforms::safe::simplify_calls::SimplifyCalls),
                 Box::new(
+                    transforms::safe::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
+                ),
+                Box::new(
+                    transforms::safe::replace_eval_calls_with_literal_content::ReplaceEvalCallsWithLiteralContent,
+                ),
+                Box::new(
+                    transforms::safe::replace_new_func_calls_with_literal_content::ReplaceNewFuncCallsWithLiteralContent,
+                ),
+                Box::new(
+                    transforms::safe::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue,
+                ),
+                Box::new(
                     transforms::safe::replace_function_shells_with_wrapped_value::ReplaceFunctionShellsWithWrappedValue,
                 ),
                 Box::new(
