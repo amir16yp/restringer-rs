@@ -419,6 +419,41 @@ fn replace_identifier_with_fixed_assigned_value_does_not_replace_object_shorthan
 }
 
 #[test]
+fn replace_identifier_with_fixed_assigned_value_not_assigned_at_declaration_replaces_number_literal() {
+    let input = "let a; a = 3; const b = a * 2; console.log(b + a);\n";
+    let output = run(input);
+    assert!(output.contains("let a") || output.contains("let a;"));
+    assert!(output.contains("a = 3") || output.contains("a=3"));
+    assert!(output.contains("const b = 3 * 2") || output.contains("const b=3*2") || output.contains("const b=3 * 2"));
+    assert!(output.contains("console.log(b + 3)") || output.contains("console.log(b+3)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_not_assigned_at_declaration_replaces_string_literal() {
+    let input = "let name; name = 'test'; alert(name);\n";
+    let output = run(input);
+    assert!(output.contains("name = 'test'") || output.contains("name=\"test\"") || output.contains("name= 'test'") || output.contains("name = \"test\""));
+    assert!(output.contains("alert('test')") || output.contains("alert(\"test\")"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_not_assigned_at_declaration_does_not_replace_for_in_iterator() {
+    let input = "let a; a = 'prop'; for (a in obj) console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("for (a in") || output.contains("for(a in"));
+    assert!(output.contains("console.log(a)") || output.contains("console.log(a);"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_assigned_value_not_assigned_at_declaration_does_not_replace_multiple_assignments() {
+    let input = "let a; a = 1; a = 2; console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("a = 1") || output.contains("a=1"));
+    assert!(output.contains("a = 2") || output.contains("a=2"));
+    assert!(output.contains("console.log(a)") || output.contains("console.log(a);"));
+}
+
+#[test]
 fn resolve_member_expressions_with_direct_assignment_replaces_reads_with_literal() {
     let input = "function a() {} a.b = 3; a.c = '5'; console.log(a.b + a.c);\n";
     let output = run(input);
