@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::{Duration, Instant}};
 
 use oxc_allocator::Allocator;
 use oxc_codegen::{Codegen, CodegenOptions, CodegenReturn};
@@ -88,6 +88,7 @@ pub struct DeobfuscateOptions {
     pub clean: bool,
     pub run_unsafe: bool,
     pub max_iterations: Option<usize>,
+    pub timeout: Option<Duration>,
     pub source_type: Option<SourceType>,
     pub filename_for_source_type: Option<PathBuf>,
 }
@@ -98,6 +99,7 @@ impl Default for DeobfuscateOptions {
             clean: false,
             run_unsafe: false,
             max_iterations: None,
+            timeout: None,
             source_type: None,
             filename_for_source_type: None,
         }
@@ -108,6 +110,7 @@ impl Default for DeobfuscateOptions {
 pub enum Error {
     InvalidSourceType { path: PathBuf, message: String },
     ParseFailed,
+    Timeout,
 }
 
 impl std::fmt::Display for Error {
@@ -117,6 +120,7 @@ impl std::fmt::Display for Error {
                 write!(f, "Failed to determine source type for {}: {}", path.display(), message)
             }
             Error::ParseFailed => write!(f, "Parsing failed"),
+            Error::Timeout => write!(f, "Operation timed out"),
         }
     }
 }
@@ -151,6 +155,16 @@ impl Restringer {
 
     pub fn deobfuscate(&self, source_text: &str, opts: DeobfuscateOptions) -> Result<DeobfuscateResult, Error> {
         let allocator = Allocator::default();
+        let start = Instant::now();
+
+        let mut check_timeout = || -> Result<(), Error> {
+            if let Some(timeout) = opts.timeout {
+                if start.elapsed() >= timeout {
+                    return Err(Error::Timeout);
+                }
+            }
+            Ok(())
+        };
 
         let source_type = if let Some(st) = opts.source_type {
             st
@@ -162,6 +176,8 @@ impl Restringer {
         };
 
         let max_iterations = opts.max_iterations.unwrap_or(self.max_iterations);
+
+        check_timeout()?;
 
         let parse_ret = Parser::new(&allocator, source_text, source_type)
             .with_options(self.parse_options)
@@ -177,14 +193,17 @@ impl Restringer {
         // Milestone 2: implement loop semantics, even if there are no transforms yet.
         let mut modified_this_round;
         loop {
+            check_timeout()?;
             modified_this_round = false;
 
             // Phase 1: apply safe transforms iteratively up to max_iterations.
             if !self.safe_transforms.is_empty() {
                 for _ in 0..max_iterations {
+                    check_timeout()?;
                     let mut modified_iter = false;
                     let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                     for t in &self.safe_transforms {
+                        check_timeout()?;
                         if t.run(&mut ctx, &mut program) {
                             modified_iter = true;
                         }
@@ -200,9 +219,11 @@ impl Restringer {
 
             // Phase 2: apply unsafe transforms exactly once.
             if opts.run_unsafe && !self.unsafe_transforms.is_empty() {
+                check_timeout()?;
                 let mut modified_iter = false;
                 let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                 for t in &self.unsafe_transforms {
+                    check_timeout()?;
                     if t.run(&mut ctx, &mut program) {
                         modified_iter = true;
                     }
@@ -221,6 +242,8 @@ impl Restringer {
         // TODO (later milestones): clean pass + normalize pass.
         let _ = opts.clean;
         let _ = self.normalize;
+
+        check_timeout()?;
 
         let CodegenReturn { code, .. } = Codegen::new()
             .with_options(self.codegen_options.clone())

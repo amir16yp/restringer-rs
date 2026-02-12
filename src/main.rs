@@ -7,6 +7,8 @@ use std::{
     process,
 };
 
+use std::time::Duration;
+
 use clap::{ArgGroup, Parser as ClapParser};
 use oxc_span::SourceType;
 
@@ -42,6 +44,10 @@ struct Cli {
     /// Run at most M iterations
     #[arg(short = 'm', long = "max-iterations")]
     max_iterations: Option<usize>,
+
+    /// Abort deobfuscation after N seconds (disabled by default)
+    #[arg(long = "timeout-seconds")]
+    timeout_seconds: Option<u64>,
 }
 
 fn main() {
@@ -77,6 +83,9 @@ fn main() {
         if let Some(m) = cli.max_iterations {
             eprintln!("[!] Running at most {m} iterations");
         }
+        if let Some(s) = cli.timeout_seconds {
+            eprintln!("[!] Timeout: {s}s");
+        }
         if cli.clean {
             eprintln!("[!] Clean enabled (no-op in Milestone 1)");
         }
@@ -92,6 +101,7 @@ fn main() {
             clean: cli.clean,
             run_unsafe: false,
             max_iterations: cli.max_iterations,
+            timeout: cli.timeout_seconds.map(Duration::from_secs),
             source_type: Some(source_type),
             filename_for_source_type: None,
         },
