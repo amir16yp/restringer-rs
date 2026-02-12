@@ -1,6 +1,12 @@
 @echo off
 setlocal
 
+REM This script is used to test the deobfuscator
+REM It downloads a JS file, runs the deobfuscator on it, and compares the output to the original file
+REM both outputs are prettified before comparison
+REM the diff is written to tests/transform.diff
+
+
 REM Run from crate root
 set "ROOT=%~dp0.."
 pushd "%ROOT%" || exit /b 1
