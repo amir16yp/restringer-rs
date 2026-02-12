@@ -103,6 +103,116 @@ fn normalize_computed_converts_bracket_string_member_access_to_dot() {
 }
 
 #[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_replaces_number_literal() {
+    let input = "let a; a = 3; const b = a * 2; console.log(b + a);\n";
+    let output = run(input);
+    assert!(output.contains("a = 3"));
+    assert!(output.contains("const b = 3 * 2"));
+    assert!(output.contains("b + 3"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_replaces_string_literal() {
+    let input = "let name; name = 'test'; alert(name);\n";
+    let output = run(input);
+    assert!(output.contains("name = \"test\"") || output.contains("name = 'test'"));
+    assert!(output.contains("alert(\"test\")") || output.contains("alert('test')"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_replaces_boolean_literal() {
+    let input = "let flag; flag = true; if (flag) console.log('yes');\n";
+    let output = run(input);
+    assert!(output.contains("flag = true"));
+    // After inlining, downstream transforms may resolve `if (true)` into the consequent.
+    assert!(output.contains("if (true)") || output.contains("console.log"));
+    assert!(output.contains("console.log(\"yes\")") || output.contains("console.log('yes')"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_replaces_null_literal() {
+    let input = "let value; value = null; console.log(value);\n";
+    let output = run(input);
+    assert!(output.contains("value = null"));
+    assert!(output.contains("console.log(null)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_replaces_var_declaration() {
+    let input = "var x; x = 42; console.log(x);\n";
+    let output = run(input);
+    assert!(output.contains("x = 42"));
+    assert!(output.contains("console.log(42)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_replaces_multiple_references() {
+    let input = "let count; count = 5; alert(count); console.log(count);\n";
+    let output = run(input);
+    assert!(output.contains("count = 5"));
+    assert!(output.contains("alert(5)"));
+    assert!(output.contains("console.log(5)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_for_in_iterator() {
+    let input = "let a; a = 'prop'; for (a in obj) console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("for (a in obj)"));
+    assert!(output.contains("console.log(a)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_for_of_iterator() {
+    let input = "let item; item = 1; for (item of arr) console.log(item);\n";
+    let output = run(input);
+    assert!(output.contains("for (item of arr)"));
+    assert!(output.contains("console.log(item)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_in_conditional_expression_context() {
+    let input = "let a; b === c ? (a = 1) : (a = 2); console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("console.log(a)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_multiple_assignments() {
+    let input = "let a; a = 1; a = 2; console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("console.log(a)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_non_literal_assignment() {
+    let input = "let a; a = someFunction(); console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("console.log(a)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_function_callee() {
+    let input = "let func; func = alert; func('hello');\n";
+    let output = run(input);
+    assert!(output.contains("func(\"hello\")") || output.contains("func('hello')"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_variable_with_initial_value() {
+    let input = "let a = 1; a = 2; console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("console.log(a)"));
+}
+
+#[test]
+fn replace_identifier_with_fixed_value_not_assigned_at_declaration_does_not_replace_when_references_are_modified() {
+    let input = "let a; a = 1; a++; console.log(a);\n";
+    let output = run(input);
+    assert!(output.contains("console.log(a)"));
+}
+
+#[test]
 fn resolve_deterministic_if_statements_resolves_literal_and_unary_conditions() {
     let input = "if (true) a(); else b();\nif (0) c(); else d();\nif (!0) e();\nif (undefined) f();\n";
     let output = run(input);

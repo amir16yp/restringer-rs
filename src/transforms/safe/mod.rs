@@ -27,3 +27,5 @@ pub mod unwrap_iifes;
 pub mod unwrap_function_shells;
 
 pub mod replace_identifier_with_fixed_assigned_value;
+
+pub mod replace_identifier_with_fixed_value_not_assigned_at_declaration;

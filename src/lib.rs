@@ -66,6 +66,9 @@ impl Default for Restringer {
                     transforms::safe::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue,
                 ),
                 Box::new(
+                    transforms::safe::replace_identifier_with_fixed_value_not_assigned_at_declaration::ReplaceIdentifierWithFixedValueNotAssignedAtDeclaration,
+                ),
+                Box::new(
                     transforms::safe::replace_function_shells_with_wrapped_value::ReplaceFunctionShellsWithWrappedValue,
                 ),
                 Box::new(
