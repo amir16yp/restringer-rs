@@ -502,6 +502,8 @@ fn replace_identifier_with_fixed_assigned_value_replaces_string_literal_referenc
             || output.contains("console.log('hello'+' world')")
             || output.contains("console.log(\"hello\" + \" world\")")
             || output.contains("console.log(\"hello\"+\" world\")")
+            || output.contains("console.log('hello world')")
+            || output.contains("console.log(\"hello world\")")
     );
 }
 

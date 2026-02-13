@@ -48,6 +48,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe::remove_redundant_block_statements::RemoveRedundantBlockStatements),
                 Box::new(transforms::safe::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
                 Box::new(transforms::safe::unwrap_simple_operations::UnwrapSimpleOperations),
+                Box::new(transforms::safe::fold_string_concatenation::FoldStringConcatenation),
                 Box::new(
                     transforms::safe::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
                 ),

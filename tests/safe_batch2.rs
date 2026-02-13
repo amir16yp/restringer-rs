@@ -84,3 +84,23 @@ fn simplify_jsfuck_booleans_rewrites_double_bang_empty_array_to_true() {
     // The pipeline may fold `if (true)` into the consequent.
     assert!(output.contains("a()"));
 }
+
+#[test]
+fn fold_string_concatenation_folds_adjacent_string_literals() {
+    let input = "var x = 'a' + 'b' + 'c';\n";
+    let output = run(input);
+    assert!(!output.contains("'a'+'b'"));
+    assert!(output.contains("'abc'") || output.contains("\"abc\""));
+}
+
+#[test]
+fn fold_string_concatenation_does_not_fold_when_non_string_involved() {
+    let input = "var x = 'a' + b;\n";
+    let output = run(input);
+    assert!(
+        output.contains("'a'+b")
+            || output.contains("'a' + b")
+            || output.contains("\"a\"+b")
+            || output.contains("\"a\" + b")
+    );
+}
