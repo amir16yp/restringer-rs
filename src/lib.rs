@@ -42,6 +42,9 @@ impl Default for Restringer {
                 ),
                 Box::new(transforms::safe::normalize_computed::NormalizeComputed),
                 Box::new(transforms::safe::normalize_empty_statements::NormalizeEmptyStatements),
+                Box::new(transforms::safe::normalize_void0::NormalizeVoid0),
+                Box::new(transforms::safe::simplify_jsfuck_booleans::SimplifyJsFuckBooleans),
+                Box::new(transforms::safe::simplify_double_negation::SimplifyDoubleNegation),
                 Box::new(transforms::safe::remove_redundant_block_statements::RemoveRedundantBlockStatements),
                 Box::new(transforms::safe::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
                 Box::new(transforms::safe::unwrap_simple_operations::UnwrapSimpleOperations),
@@ -57,6 +60,7 @@ impl Default for Restringer {
                 ),
                 Box::new(transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
                 Box::new(transforms::safe::simplify_module_factory_call::SimplifyModuleFactoryCall),
+                Box::new(transforms::safe::unwrap_bind_null_literal::UnwrapBindNullLiteral),
                 Box::new(transforms::safe::simplify_calls::SimplifyCalls),
                 Box::new(
                     transforms::safe::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,

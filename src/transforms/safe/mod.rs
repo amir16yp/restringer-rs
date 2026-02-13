@@ -1,12 +1,16 @@
 pub mod normalize_empty_statements;
 pub mod normalize_computed;
+pub mod normalize_void0;
 pub mod parse_template_literals_into_string_literals;
 pub mod rearrange_sequences;
 pub mod rearrange_switches;
 pub mod remove_redundant_block_statements;
+pub mod simplify_double_negation;
+pub mod simplify_jsfuck_booleans;
 pub mod simplify_calls;
 pub mod replace_function_return_this;
 pub mod simplify_module_factory_call;
+pub mod unwrap_bind_null_literal;
 pub mod unwrap_webpack_bootstrap;
 pub mod simplify_babel_class_helpers;
 pub mod replace_call_expressions_with_unwrapped_identifier;
