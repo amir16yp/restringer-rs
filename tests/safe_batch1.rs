@@ -587,3 +587,11 @@ fn resolve_member_expressions_with_direct_assignment_does_not_replace_non_litera
     assert!(output.contains("a[k] = 3") || output.contains("a[k]=3"));
     assert!(output.contains("console.log(a[k])") || output.contains("console.log(a[k])"));
 }
+
+#[test]
+fn resolve_string_array_decoder_calls_inlines_simple_decoder_call() {
+    let input = "function _0x2047(){return ['a','b','c'];}\nfunction _0x4274(x,y){x=x-1;const arr=_0x2047();return arr[x];}\nconst z=_0x4274(2);\n";
+    let output = run(input);
+    assert!(output.contains("const z = \"b\"") || output.contains("const z=\"b\"") || output.contains("const z = 'b'") || output.contains("const z='b'"));
+    assert!(!output.contains("_0x4274(2"));
+}
