@@ -32,6 +32,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe::resolve_proxy_references::ResolveProxyReferences),
                 Box::new(transforms::safe::resolve_string_array_decoder_calls::ResolveStringArrayDecoderCalls),
                 Box::new(transforms::safe::resolve_dispatch_table_calls::ResolveDispatchTableCalls),
+                Box::new(transforms::safe::replace_function_return_this::ReplaceFunctionReturnThis),
                 Box::new(
                     transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
                 ),
@@ -54,6 +55,7 @@ impl Default for Restringer {
                     transforms::safe::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
                 ),
                 Box::new(transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
+                Box::new(transforms::safe::simplify_module_factory_call::SimplifyModuleFactoryCall),
                 Box::new(transforms::safe::simplify_calls::SimplifyCalls),
                 Box::new(
                     transforms::safe::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,

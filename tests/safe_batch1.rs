@@ -611,3 +611,27 @@ fn resolve_dispatch_table_calls_rewrites_array_table_indirect_call() {
     assert!(output.contains("const y = a(2)") || output.contains("const y=a(2)") || output.contains("const y = 2 + 1") || output.contains("const y=2+1"));
     assert!(!output.contains("tbl[0](2"));
 }
+
+#[test]
+fn replace_function_return_this_replaces_with_global_this() {
+    let input = "const g = Function('return this')();\n";
+    let output = run(input);
+    assert!(output.contains("const g = globalThis") || output.contains("const g=globalThis"));
+    assert!(!output.contains("Function(\"return this\")") && !output.contains("Function('return this')"));
+}
+
+#[test]
+fn simplify_module_factory_call_rewrites_call_null_thisarg() {
+    let input = "function f(a,b){return a+b;}\nf.call(null, 1, 2);\n";
+    let output = run(input);
+    assert!(!output.contains(".call(null"));
+    assert!(output.contains("f(1, 2)") || output.contains("f(1,2)") || output.contains("1 + 2") || output.contains("1+2"));
+}
+
+#[test]
+fn simplify_module_factory_call_rewrites_call_undefined_thisarg() {
+    let input = "function f(a,b){return a+b;}\nf.call(undefined, 1, 2);\n";
+    let output = run(input);
+    assert!(!output.contains(".call(undefined"));
+    assert!(output.contains("f(1, 2)") || output.contains("f(1,2)") || output.contains("1 + 2") || output.contains("1+2"));
+}
