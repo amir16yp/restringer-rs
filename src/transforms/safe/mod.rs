@@ -8,6 +8,7 @@ pub mod simplify_calls;
 pub mod replace_function_return_this;
 pub mod simplify_module_factory_call;
 pub mod unwrap_webpack_bootstrap;
+pub mod simplify_babel_class_helpers;
 pub mod replace_call_expressions_with_unwrapped_identifier;
 pub mod replace_eval_calls_with_literal_content;
 pub mod replace_new_func_calls_with_literal_content;

@@ -1,4 +1,4 @@
-!(function(funcsArray) {
+(function(funcsArray) {
 	var allFuncs = {};
 	function getterFunc(index) {
 		if (allFuncs[index]) return allFuncs[index].exports;
@@ -148,7 +148,7 @@
 	},
 	function(exp, t) {
 		// getWindow i = 5
-		var _window = exp.exports = "undefined" != typeof window && window.Math == Math ? window : "undefined" != typeof self && self.Math == Math ? self : Function("return this")();
+		var _window = exp.exports = "undefined" != typeof window && window.Math == Math ? window : "undefined" != typeof self && self.Math == Math ? self : globalThis;
 		if (typeof __g == "number") __g = _window;
 	},
 	function(exp, t) {
@@ -14048,7 +14048,7 @@
 						done: true
 					};
 				}
-			})(this || "object" === ("undefined" == typeof self ? "undefined" : i(self)) && self || Function("return this")());
+			})(this || "object" === ("undefined" == typeof self ? "undefined" : i(self)) && self || globalThis);
 		}).call(this, i(122)(e), i(41));
 	},
 	function(e, t, i) {
@@ -14246,7 +14246,7 @@
 					if (void 0 !== r) e = r;
 					else if ("undefined" != typeof self) e = self;
 					else try {
-						e = Function("return this")();
+						e = globalThis;
 					} catch (e) {
 						throw new Error("polyfill failed because global object is unavailable in this environment");
 					}

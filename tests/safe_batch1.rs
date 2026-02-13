@@ -651,3 +651,24 @@ fn unwrap_webpack_bootstrap_renames_require_fn_to_webpack_require() {
     assert!(output.contains("__webpack_require__"));
     assert!(!output.contains("return r("));
 }
+
+#[test]
+fn simplify_babel_class_helpers_inlines_simple_descriptor_array_to_assignments() {
+    let input = "function n(e,t){for(var i=0;i<t.length;i++){var n=t[i];Object.defineProperty(e,n.key,n);}}\nfunction C(){}\nn(C.prototype,[{key:\"m\",value:function(){return 1;}}]);\n";
+    let output = run(input);
+    assert!(!output.contains("Object.defineProperty(C.prototype"));
+    assert!(
+        output.contains("C.prototype.\"m\"")
+            || output.contains("C.prototype.m")
+            || output.contains("C.prototype[\"m\"]")
+            || output.contains("C.prototype['m']")
+    );
+}
+
+#[test]
+fn simplify_babel_class_helpers_inlines_static_props() {
+    let input = "function n(e,t){for(var i=0;i<t.length;i++){var n=t[i];Object.defineProperty(e,n.key,n);}}\nfunction C(){}\nn(C,[{key:\"x\",value:1}]);\n";
+    let output = run(input);
+    assert!(!output.contains("Object.defineProperty(C"));
+    assert!(output.contains("C.x") || output.contains("C[\"x\"]") || output.contains("C['x']"));
+}

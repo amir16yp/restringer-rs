@@ -1,9 +1,10 @@
 diff --git "a/tests\\app.js" "b/tests\\app_deobf_pretty.js"
-index 411a842..8439397 100644
+index 411a842..3a89c8f 100644
 --- "a/tests\\app.js"
 +++ "b/tests\\app_deobf_pretty.js"
 @@ -1,15 +1,12 @@
- !(function (funcsArray) {
+-!(function (funcsArray) {
++(function (funcsArray) {
    var allFuncs = {};
 -
    function getterFunc(index) {
@@ -147,11 +148,13 @@ index 411a842..8439397 100644
          if ("number" != typeof e)
            throw new TypeError("Argument must be a number");
          return n.SlowBuffer(e);
-@@ -221,7 +210,6 @@
+@@ -220,8 +209,7 @@
+         ? window
          : "undefined" != typeof self && self.Math == Math
            ? self
-           : Function("return this")());
+-          : Function("return this")());
 -
++          : globalThis);
      if (typeof __g == "number") __g = _window;
    },
    function (exp, t) {
@@ -6997,7 +7000,7 @@ index 411a842..8439397 100644
 +        this ||
 +          ("object" === ("undefined" == typeof self ? "undefined" : i(self)) &&
 +            self) ||
-+          Function("return this")(),
++          globalThis,
        );
      }).call(this, i(122)(e), i(41));
    },
@@ -7093,6 +7096,15 @@ index 411a842..8439397 100644
          }
          var z = 0;
          function j(e) {
+@@ -23930,7 +23846,7 @@
+           else if ("undefined" != typeof self) e = self;
+           else
+             try {
+-              e = Function("return this")();
++              e = globalThis;
+             } catch (e) {
+               throw new Error(
+                 "polyfill failed because global object is unavailable in this environment",
 @@ -24082,16 +23998,18 @@
              (s[c++] = (t >> 16) & 255),
              (s[c++] = (t >> 8) & 255),
