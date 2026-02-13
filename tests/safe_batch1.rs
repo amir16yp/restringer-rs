@@ -655,6 +655,14 @@ fn unwrap_webpack_bootstrap_renames_require_fn_to_webpack_require() {
 }
 
 #[test]
+fn detect_webpack_bundle_normalizes_module_factory_param_names() {
+    let input = "var m = {573:function(e,t,i){var x=i(1);t.a=x;}};";
+    let output = run(input);
+    assert!(output.contains("__webpack_require__(1)"));
+    assert!(output.contains("exports.a"));
+}
+
+#[test]
 fn simplify_babel_class_helpers_inlines_simple_descriptor_array_to_assignments() {
     let input = "function n(e,t){for(var i=0;i<t.length;i++){var n=t[i];Object.defineProperty(e,n.key,n);}}\nfunction C(){}\nn(C.prototype,[{key:\"m\",value:function(){return 1;}}]);\n";
     let output = run(input);

@@ -14,6 +14,7 @@ pub mod replace_function_return_this;
 pub mod simplify_module_factory_call;
 pub mod unwrap_bind_null_literal;
 pub mod unwrap_webpack_bootstrap;
+pub mod detect_webpack_bundle;
 pub mod simplify_babel_class_helpers;
 pub mod replace_call_expressions_with_unwrapped_identifier;
 pub mod replace_eval_calls_with_literal_content;
