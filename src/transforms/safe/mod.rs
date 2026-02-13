@@ -16,6 +16,7 @@ pub mod unwrap_bind_null_literal;
 pub mod unwrap_webpack_bootstrap;
 pub mod detect_webpack_bundle;
 pub mod simplify_babel_class_helpers;
+pub mod simplify_babel_es5_class_to_class;
 pub mod replace_call_expressions_with_unwrapped_identifier;
 pub mod replace_eval_calls_with_literal_content;
 pub mod replace_new_func_calls_with_literal_content;
@@ -37,6 +38,7 @@ pub mod replace_boolean_expressions_with_if;
 pub mod replace_sequences_with_expressions;
 pub mod unwrap_simple_operations;
 pub mod unwrap_iifes;
+pub mod unwrap_iife_returning_identifier;
 pub mod unwrap_function_shells;
 
 pub mod replace_identifier_with_fixed_assigned_value;
