@@ -1,5 +1,5 @@
 diff --git "a/tests\\app.js" "b/tests\\app_deobf_pretty.js"
-index 411a842..b3da3f9 100644
+index 411a842..76294fe 100644
 --- "a/tests\\app.js"
 +++ "b/tests\\app_deobf_pretty.js"
 @@ -1,97 +1,29 @@
@@ -233,7 +233,7 @@ index 411a842..b3da3f9 100644
      i.r(t);
 -    var r = (function () {
 -      function e() {
-+    class e {
++    class _e {
 +      constructor() {
          return (
            (function (e, t) {
@@ -17385,7 +17385,7 @@ index 411a842..b3da3f9 100644
 -                        (t & e.ErrorLogLevel) === e.ErrorLogLevel
 -                          ? (e.Error = e._ErrorEnabled)
 -                          : (e.Error = e._ErrorDisabled));
-+              class e {
++              class _e {
 +                constructor() {}
 +                static _AddLogEntry(t) {
 +                  ((e._LogCache = t + e._LogCache),
@@ -21118,7 +21118,7 @@ index 411a842..b3da3f9 100644
 -                  e
 -                );
 -              })();
-+              class e {
++              class _e {
 +                constructor() {}
 +                static WithinEpsilon(e, t, i) {
 +                  if (undefined === i) {
@@ -24226,7 +24226,7 @@ index 411a842..b3da3f9 100644
 -                  e
 -                );
 -              })();
-+              class e {
++              class _e {
 +                constructor() {}
 +                static WarnImport(e) {
 +                  return (
@@ -24946,7 +24946,7 @@ index 411a842..b3da3f9 100644
 -                  e
 -                );
 -              })();
-+              class e {
++              class _e {
 +                constructor() {}
 +                static GetClass(e) {
 +                  return this.RegisteredTypes && this.RegisteredTypes[e]
@@ -27305,7 +27305,7 @@ index 411a842..b3da3f9 100644
                });
 -              var n = (function () {
 -                function e() {
-+              class e {
++              class _e {
 +                constructor() {
                    ((this.rootNodes = new Array()),
                      (this.cameras = new Array()),
@@ -28706,7 +28706,7 @@ index 411a842..b3da3f9 100644
 -                  e
 -                );
 -              })();
-+              class e {
++              class _e {
 +                constructor() {}
 +                static BuildArray(e, t) {
 +                  for (var i = [], n_tmp = 0; n_tmp < e; ++n_tmp) i.push(t());
@@ -28735,7 +28735,7 @@ index 411a842..b3da3f9 100644
 -                  e
 -                );
 -              })();
-+              class e {
++              class _e {
 +                constructor() {}
 +                static IsWindowObjectExist() {
 +                  return "undefined" != typeof window;
@@ -28756,7 +28756,7 @@ index 411a842..b3da3f9 100644
                });
 -              var n = (function () {
 -                function e(e, t, i, n, r, o) {
-+              class e {
++              class _e {
 +                constructor(e, t, i, n_tmp, r, o) {
                    ((this.source = e),
                      (this.pointerX = t),
@@ -32120,7 +32120,7 @@ index 411a842..b3da3f9 100644
                });
 -              var n = (function () {
 -                function e() {
-+              class e {
++              class _e {
 +                constructor() {
                    this._xhr = new XMLHttpRequest();
                  }
@@ -32324,7 +32324,7 @@ index 411a842..b3da3f9 100644
                });
 -              var n = (function () {
 -                function e() {
-+              class e {
++              class _e {
 +                constructor() {
                    ((this._count = 0), (this._data = {}));
                  }
@@ -76264,7 +76264,7 @@ index 411a842..b3da3f9 100644
 -                              a = "false";
 -                              break;
 -                            }
-+              class e {
++              class _e {
 +                constructor() {}
 +                static Eval(t, i) {
 +                  return (

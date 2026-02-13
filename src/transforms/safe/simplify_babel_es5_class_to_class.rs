@@ -16,7 +16,7 @@ impl Transform for SimplifyBabelEs5ClassToClass {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor { allocator: ctx.allocator, modified: false, reserved_param_stack: Vec::new() };
         v.visit_program(program);
         v.modified
     }
@@ -25,6 +25,7 @@ impl Transform for SimplifyBabelEs5ClassToClass {
 struct Visitor<'a> {
     allocator: &'a oxc_allocator::Allocator,
     modified: bool,
+    reserved_param_stack: Vec<HashSet<String>>,
 }
 
 impl<'a> Visitor<'a> {
@@ -34,6 +35,80 @@ impl<'a> Visitor<'a> {
                 Expression::ParenthesizedExpression(p) => expr = &p.expression,
                 _ => return expr,
             }
+        }
+    }
+
+    fn current_reserved_param_names(&self) -> Option<&HashSet<String>> {
+        self.reserved_param_stack.last()
+    }
+
+    fn collect_param_names(params: &FormalParameters<'a>) -> HashSet<String> {
+        let mut out = HashSet::new();
+        for p in &params.items {
+            if let BindingPattern::BindingIdentifier(id) = &p.pattern {
+                out.insert(id.name.as_str().to_string());
+            }
+        }
+        out
+    }
+
+    fn make_safe_class_name(&self, desired: &str, reserved: Option<&HashSet<String>>) -> String {
+        let Some(reserved) = reserved else {
+            return desired.to_string();
+        };
+        if !reserved.contains(desired) {
+            return desired.to_string();
+        }
+        // Choose a deterministic name that avoids collisions with in-scope parameter bindings.
+        // Keep it simple: prefix '_' until it's free.
+        let mut candidate = format!("_{desired}");
+        while reserved.contains(candidate.as_str()) {
+            candidate = format!("_{candidate}");
+        }
+        candidate
+    }
+
+    fn rename_identifier_references_in_statement_list(
+        &self,
+        stmts: &mut ArenaVec<'a, Statement<'a>>,
+        from: &str,
+        to: &str,
+    ) {
+        if from == to {
+            return;
+        }
+        let from_owned = from.to_string();
+        let to_alloc = self.allocator.alloc_str(to);
+
+        struct Renamer<'a> {
+            allocator: &'a oxc_allocator::Allocator,
+            from: String,
+            to: &'a str,
+        }
+
+        impl<'a> VisitMut<'a> for Renamer<'a> {
+            fn visit_expression(&mut self, it: &mut Expression<'a>) {
+                if let Expression::Identifier(id) = it {
+                    if id.name.as_str() == self.from.as_str() {
+                        let name = self.allocator.alloc_str(self.to);
+                        id.name = name.into();
+                    }
+                }
+                oxc_ast_visit::walk_mut::walk_expression(self, it);
+            }
+
+            fn visit_function(&mut self, _it: &mut Function<'a>, _flags: oxc_syntax::scope::ScopeFlags) {
+                // Do not descend into nested functions.
+            }
+
+            fn visit_arrow_function_expression(&mut self, _it: &mut ArrowFunctionExpression<'a>) {
+                // Do not descend into nested arrows.
+            }
+        }
+
+        let mut r = Renamer { allocator: self.allocator, from: from_owned, to: to_alloc };
+        for s in stmts.iter_mut() {
+            r.visit_statement(s);
         }
     }
 
@@ -533,10 +608,6 @@ impl<'a> Visitor<'a> {
     }
 
     fn rewrite_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
-        if stmts.is_empty() {
-            return;
-        }
-
         let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut out = ArenaVec::new_in(self.allocator);
 
@@ -703,12 +774,21 @@ impl<'a> Visitor<'a> {
                 self.modified = true;
             }
 
+            let reserved = self.current_reserved_param_names();
+            let original_name = id.name.as_str();
+            let safe_name = self.make_safe_class_name(original_name, reserved);
+            let mut class_id = id.clone_in(self.allocator);
+            if safe_name != original_name {
+                let safe_alloc = self.allocator.alloc_str(&safe_name);
+                class_id.name = safe_alloc.into();
+            }
+
             let class_body = ClassBody { span: func.span, body: elements };
             let class = Class {
                 span: func.span,
                 r#type: ClassType::ClassDeclaration,
                 decorators: ArenaVec::new_in(self.allocator),
-                id: Some(id.clone_in(self.allocator)),
+                id: Some(class_id),
                 type_parameters: None,
                 super_class,
                 super_type_arguments: None,
@@ -721,8 +801,17 @@ impl<'a> Visitor<'a> {
 
             out.push(Statement::ClassDeclaration(ArenaBox::new_in(class, self.allocator)));
 
-            for s in trailing_export_stmts {
-                out.push(s);
+            if safe_name != original_name {
+                // Update references in any trailing statements we preserved (e.g. `module.exports = C;`).
+                let mut trailing = trailing_export_stmts;
+                self.rename_identifier_references_in_statement_list(&mut trailing, original_name, &safe_name);
+                for s in trailing {
+                    out.push(s);
+                }
+            } else {
+                for s in trailing_export_stmts {
+                    out.push(s);
+                }
             }
 
             self.modified = true;
@@ -747,6 +836,20 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     fn visit_block_statement(&mut self, it: &mut BlockStatement<'a>) {
         self.rewrite_statement_list(&mut it.body);
         oxc_ast_visit::walk_mut::walk_block_statement(self, it);
+    }
+
+    fn visit_function(&mut self, it: &mut Function<'a>, flags: oxc_syntax::scope::ScopeFlags) {
+        let reserved = Self::collect_param_names(&it.params);
+        self.reserved_param_stack.push(reserved);
+        oxc_ast_visit::walk_mut::walk_function(self, it, flags);
+        let _ = self.reserved_param_stack.pop();
+    }
+
+    fn visit_arrow_function_expression(&mut self, it: &mut ArrowFunctionExpression<'a>) {
+        let reserved = Self::collect_param_names(&it.params);
+        self.reserved_param_stack.push(reserved);
+        oxc_ast_visit::walk_mut::walk_arrow_function_expression(self, it);
+        let _ = self.reserved_param_stack.pop();
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'a>) {

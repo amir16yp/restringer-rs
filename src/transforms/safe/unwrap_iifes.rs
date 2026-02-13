@@ -91,6 +91,21 @@ impl<'a> Visitor<'a> {
             return None;
         }
 
+        // Important: unwrapping an IIFE removes a function scope.
+        // That can turn previously-legal declarations into redeclarations in the surrounding scope
+        // (e.g. `function e(){}` inside one IIFE + `class e{}` in the outer scope).
+        // Be conservative: do not unwrap if the IIFE contains top-level declarations.
+        if body.statements.iter().any(|s| {
+            matches!(
+                s,
+                Statement::FunctionDeclaration(_)
+                    | Statement::ClassDeclaration(_)
+                    | Statement::VariableDeclaration(_)
+            )
+        }) {
+            return None;
+        }
+
         let mut out = ArenaVec::new_in(self.allocator);
         for s in &body.statements {
             out.push(CloneIn::clone_in(s, self.allocator));

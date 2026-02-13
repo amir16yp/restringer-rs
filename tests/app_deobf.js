@@ -135,7 +135,7 @@
 			}
 		}
 		i.r(t);
-		class e {
+		class _e {
 			constructor() {
 				return (function(e, t) {
 					if (!(e instanceof t)) throw new TypeError("Cannot call a class as a function");
@@ -17357,7 +17357,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {}
 							static _AddLogEntry(t) {
 								e._LogCache = t + e._LogCache, e.OnNewCacheEntry && e.OnNewCacheEntry(t);
@@ -20991,7 +20991,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {}
 							static WithinEpsilon(e, t, i) {
 								if (undefined === i) {
@@ -23185,7 +23185,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {}
 							static WarnImport(e) {
 								return e + " needs to be imported before as it contains a side-effect required by your code.";
@@ -23777,7 +23777,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {}
 							static GetClass(e) {
 								return this.RegisteredTypes && this.RegisteredTypes[e] ? this.RegisteredTypes[e] : null;
@@ -25258,7 +25258,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {
 								this.rootNodes = new Array(), this.cameras = new Array(), this.lights = new Array(), this.meshes = new Array(), this.skeletons = new Array(), this.particleSystems = new Array(), this.animations = [], this.animationGroups = new Array(), this.multiMaterials = new Array(), this.materials = new Array(), this.morphTargetManagers = new Array(), this.geometries = new Array(), this.transformNodes = new Array(), this.actionManagers = new Array(), this.textures = new Array(), this.environmentTexture = null;
 							}
@@ -26051,7 +26051,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {}
 							static BuildArray(e, t) {
 								for (var i = [], n_tmp = 0; n_tmp < e; ++n_tmp) i.push(t());
@@ -26065,7 +26065,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {}
 							static IsWindowObjectExist() {
 								return "undefined" != typeof window;
@@ -26082,7 +26082,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor(e, t, i, n_tmp, r, o) {
 								this.source = e, this.pointerX = t, this.pointerY = i, this.meshUnderPointer = n_tmp, this.sourceEvent = r, this.additionalData = o;
 							}
@@ -28884,7 +28884,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {
 								this._xhr = new XMLHttpRequest();
 							}
@@ -28984,7 +28984,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {
 								this._count = 0, this._data = {};
 							}
@@ -60286,7 +60286,7 @@
 						i.d(t, "a", function() {
 							return n;
 						});
-						class e {
+						class _e {
 							constructor() {}
 							static Eval(t, i) {
 								return "true" === (t = t.match(/\([^\(\)]*\)/g) ? t.replace(/\([^\(\)]*\)/g, function(t) {
