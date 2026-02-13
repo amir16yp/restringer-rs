@@ -595,3 +595,19 @@ fn resolve_string_array_decoder_calls_inlines_simple_decoder_call() {
     assert!(output.contains("const z = \"b\"") || output.contains("const z=\"b\"") || output.contains("const z = 'b'") || output.contains("const z='b'"));
     assert!(!output.contains("_0x4274(2"));
 }
+
+#[test]
+fn resolve_dispatch_table_calls_rewrites_object_table_indirect_call() {
+    let input = "function a(x){return x+1;}\nconst tbl = { add: a };\nconst y = tbl['add'](2);\n";
+    let output = run(input);
+    assert!(output.contains("const y = a(2)") || output.contains("const y=a(2)") || output.contains("const y = 2 + 1") || output.contains("const y=2+1"));
+    assert!(!output.contains("tbl['add']"));
+}
+
+#[test]
+fn resolve_dispatch_table_calls_rewrites_array_table_indirect_call() {
+    let input = "function a(x){return x+1;}\nconst tbl = [a];\nconst y = tbl[0](2);\n";
+    let output = run(input);
+    assert!(output.contains("const y = a(2)") || output.contains("const y=a(2)") || output.contains("const y = 2 + 1") || output.contains("const y=2+1"));
+    assert!(!output.contains("tbl[0](2"));
+}

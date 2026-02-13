@@ -31,6 +31,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe::resolve_proxy_calls::ResolveProxyCalls),
                 Box::new(transforms::safe::resolve_proxy_references::ResolveProxyReferences),
                 Box::new(transforms::safe::resolve_string_array_decoder_calls::ResolveStringArrayDecoderCalls),
+                Box::new(transforms::safe::resolve_dispatch_table_calls::ResolveDispatchTableCalls),
                 Box::new(
                     transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
                 ),
