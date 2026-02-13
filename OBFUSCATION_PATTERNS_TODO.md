@@ -101,6 +101,90 @@ In this file, many hits are from Buffer/polyfill code, but it’s still a useful
 
 I didn’t see a dedicated transform for `fromCharCode` folding in `src/transforms/safe/`.
 
+## 4) Base64 / `data:` URI decoding via `atob(...)`
+
+### Examples
+
+- Around line ~30926 / ~30944:
+  - `i(window.atob(t.substr(7)))`
+- Around line ~146836:
+  - `if (/^data:[^;]+;base64,/.test(t)) { var i = atob(t.split(",")[1]); ... }`
+
+### Why it’s interesting
+
+- Obfuscators commonly hide payloads / shader code / configuration as base64.
+- When the base64 input is **fully deterministic**, you can fold it to a literal string (or even bytes) and unlock more downstream transforms.
+
+### Suggested safe transform
+
+- **Name**: `fold_atob_base64_literal`
+- **When**:
+  - `atob(<string-literal>)`
+  - `window.atob(<string-literal>)`
+  - `atob(<template/concat/join>)` where constant folding reduces to a literal
+  - `atob(<string-literal>.split(",")[1])` for `data:*;base64,...` literals
+- **Rewrite**:
+  - Replace call with a string literal of the decoded content.
+
+## 5) Pipe-delimited “packed values” parsed with `split("|")` + `parseInt`
+
+### Examples
+
+- Around line ~10847:
+  - `var o = e.split("|")`
+  - `parseInt(o[0], 10)`, `parseInt(o[1], 10)`, `parseInt(o[2], 10)`
+- Around line ~141213:
+  - `var t = e.split("|"); return [parseInt(t[0]), parseInt(t[1]), parseInt(t[2])];`
+
+### Why it’s interesting
+
+- This is a common micro-obfuscation / minification trick: multiple integers are “packed” into a single string to reduce readability.
+- If the packed string is constant (or becomes constant), the parse can be folded to a literal array/tuple.
+
+### Suggested safe transform
+
+- **Name**: `fold_split_pipe_parseint`
+- **When**:
+  - `"<a>|<b>|<c>".split("|")` where all items are numeric literals
+  - Followed by `parseInt(<item>, 10)` (or unary `+<item>`)
+- **Rewrite**:
+  - Replace the whole parse sequence with a numeric array literal like `[a, b, c]` (or inline constants).
+
+## 6) Webpack-style bundle/module wrapper meta-patterns (`__webpack_require__`, module array)
+
+### Examples
+
+Multiple module factory wrappers like:
+
+- Around line ~16658:
+  - `function (module, exports, __webpack_require__) { ... }`
+- Around line ~154006:
+  - `function (module, exports, __webpack_require__) { ... }`
+  - with internal imports like `var indexOf = __webpack_require__(573)`
+
+### Why it’s interesting
+
+- This is not “obfuscation” per se, but it is a **meta-pattern** that:
+  - hides original file/module boundaries
+  - blocks some local transforms (because helpers/decoders live in other bundled modules)
+  - makes it harder to reason about side effects (top-level IIFEs / bootstrap code)
+
+### Suggested safe transform(s)
+
+- **Name**: `detect_webpack_bundle`
+  - **When**:
+    - A top-level array/object of module factories exists and entries have the signature `(module, exports, __webpack_require__)` (or `(e, t, i)` in minified form)
+    - Calls to `__webpack_require__(<numeric-id>)` appear
+  - **Rewrite idea** (safe/non-semantic):
+    - Add structure/annotations in the AST/IR: identify the module table, the require function, and entry module id.
+    - Optionally hoist module factories into named functions (e.g., `_wp_mod_573`) to improve readability.
+
+- **Name**: `inline_webpack_require_for_pure_modules`
+  - **When**:
+    - A required module is proven **pure** (no observable side effects at evaluation time) and exports only literals/functions that are themselves pure
+  - **Rewrite**:
+    - Inline `__webpack_require__(id)` usages with the resolved exported value(s), enabling further constant folding.
+
 ## Non-findings (good to know)
 
 In quick scans/greps I did **not** see the classic control-flow-flattening signature:

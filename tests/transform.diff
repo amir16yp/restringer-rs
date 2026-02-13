@@ -1,5 +1,5 @@
 diff --git "a/tests\\app.js" "b/tests\\app_deobf_pretty.js"
-index 411a842..90b4504 100644
+index 411a842..f6eb5e4 100644
 --- "a/tests\\app.js"
 +++ "b/tests\\app_deobf_pretty.js"
 @@ -1,15 +1,12 @@
@@ -54091,7 +54091,20 @@ index 411a842..90b4504 100644
              (r.applyForce([s, 0, c]), a.animate(t));
              Math.atan2(r.velocity[0], r.velocity[2]);
              if (
-@@ -147044,7 +148971,7 @@ and limitations under the License.
+@@ -147000,11 +148927,7 @@ and limitations under the License.
+       (t.randomFillSync = h.randomFillSync),
+       (t.createCredentials = function () {
+         throw new Error(
+-          [
+-            "sorry, createCredentials is not implemented yet",
+-            "we accept pull requests",
+-            "https://github.com/crypto-browserify/crypto-browserify",
+-          ].join("\n"),
++          "sorry, createCredentials is not implemented yet\nwe accept pull requests\nhttps://github.com/crypto-browserify/crypto-browserify",
+         );
+       }),
+       (t.constants = {
+@@ -147044,7 +148967,7 @@ and limitations under the License.
        a = [1518500249, 1859775393, -1894007588, -899497514],
        s = new Array(80);
      function c() {
@@ -54100,7 +54113,7 @@ index 411a842..90b4504 100644
      }
      function u(e) {
        return (e << 30) | (e >>> 2);
-@@ -147083,10 +149010,10 @@ and limitations under the License.
+@@ -147083,10 +149006,10 @@ and limitations under the License.
            i[h] = e.readInt32BE(4 * h);
          for (; h < 80; ++h) i[h] = i[h - 3] ^ i[h - 8] ^ i[h - 14] ^ i[h - 16];
          for (var f = 0; f < 80; ++f) {
@@ -54115,7 +54128,7 @@ index 411a842..90b4504 100644
            ((c = s), (s = o), (o = u(r)), (r = n), (n = p));
          }
          ((this._a = (n + this._a) | 0),
-@@ -147115,7 +149042,7 @@ and limitations under the License.
+@@ -147115,7 +149038,7 @@ and limitations under the License.
        a = [1518500249, 1859775393, -1894007588, -899497514],
        s = new Array(80);
      function c() {
@@ -54124,7 +54137,7 @@ index 411a842..90b4504 100644
      }
      function u(e) {
        return (e << 5) | (e >>> 27);
-@@ -147160,8 +149087,8 @@ and limitations under the License.
+@@ -147160,8 +149083,8 @@ and limitations under the License.
              ((t = i[f - 3] ^ i[f - 8] ^ i[f - 14] ^ i[f - 16]) << 1) |
              (t >>> 31);
          for (var d = 0; d < 80; ++d) {
@@ -54135,7 +54148,7 @@ index 411a842..90b4504 100644
            ((c = s), (s = o), (o = l(r)), (r = n), (n = m));
          }
          ((this._a = (n + this._a) | 0),
-@@ -147190,7 +149117,7 @@ and limitations under the License.
+@@ -147190,7 +149113,7 @@ and limitations under the License.
        a = i(2).Buffer,
        s = new Array(64);
      function c() {
@@ -54144,7 +54157,7 @@ index 411a842..90b4504 100644
      }
      (n(c, r),
        (c.prototype.init = function () {
-@@ -147228,7 +149155,7 @@ and limitations under the License.
+@@ -147228,7 +149151,7 @@ and limitations under the License.
        a = i(2).Buffer,
        s = new Array(160);
      function c() {
@@ -54153,7 +54166,7 @@ index 411a842..90b4504 100644
      }
      (n(c, r),
        (c.prototype.init = function () {
-@@ -147277,7 +149204,7 @@ and limitations under the License.
+@@ -147277,7 +149200,7 @@ and limitations under the License.
        a = r.alloc(128),
        s = 64;
      function c(e, t) {
@@ -54162,7 +54175,7 @@ index 411a842..90b4504 100644
          "string" == typeof t && (t = r.from(t)),
          (this._alg = e),
          (this._key = t),
-@@ -147327,24 +149254,14 @@ and limitations under the License.
+@@ -147327,24 +149250,14 @@ and limitations under the License.
          f = [];
        function d(e, t, i, n, r) {
          return l
@@ -54189,7 +54202,7 @@ index 411a842..90b4504 100644
                },
                e,
                n << 3,
-@@ -147355,7 +149272,9 @@ and limitations under the License.
+@@ -147355,7 +149268,9 @@ and limitations under the License.
            });
        }
        e.exports = function (e, i, p, m, g, _) {
@@ -54200,7 +54213,7 @@ index 411a842..90b4504 100644
          var v = h[(g = g || "sha1").toLowerCase()];
          if (!v || "function" != typeof t.Promise)
            return r.nextTick(function () {
-@@ -147388,7 +149307,7 @@ and limitations under the License.
+@@ -147388,7 +149303,7 @@ and limitations under the License.
              (function (e) {
                if (t.process && !t.process.browser) return n.resolve(false);
                if (!l || !l.importKey || !l.deriveBits) return n.resolve(false);
@@ -54209,7 +54222,7 @@ index 411a842..90b4504 100644
                var i = d((o = o || u.alloc(8)), o, 10, 128, e)
                  .then(function () {
                    return true;
-@@ -147475,7 +149394,7 @@ and limitations under the License.
+@@ -147475,7 +149390,7 @@ and limitations under the License.
          "des-ecb": r.DES,
        };
      function c(e) {
@@ -54218,7 +54231,7 @@ index 411a842..90b4504 100644
        var t,
          i = e.mode.toLowerCase(),
          r = s[i];
-@@ -147673,10 +149592,11 @@ and limitations under the License.
+@@ -147673,10 +149588,11 @@ and limitations under the License.
            i = 0,
            n = ((this.bufferOff + e.length) / this.blockSize) | 0,
            r = new Array(n * this.blockSize);
@@ -54233,7 +54246,7 @@ index 411a842..90b4504 100644
          for (
            var o = e.length - ((e.length - t) % this.blockSize);
            t < o;
-@@ -147740,7 +149660,7 @@ and limitations under the License.
+@@ -147740,7 +149656,7 @@ and limitations under the License.
        ((this.tmp = new Array(2)), (this.keys = null));
      }
      function u(e) {
@@ -54242,7 +54255,7 @@ index 411a842..90b4504 100644
        var t = new c();
        ((this._desState = t), this.deriveKeys(t, e.key));
      }
-@@ -147787,23 +149707,23 @@ and limitations under the License.
+@@ -147787,23 +149703,23 @@ and limitations under the License.
        }),
        (u.prototype._encrypt = function (e, t, i, n, r) {
          for (var o = t, s = i, c = 0; c < e.keys.length; c += 2) {
@@ -54276,7 +54289,7 @@ index 411a842..90b4504 100644
          }
          a.rip(o, s, n, r);
        }));
-@@ -147819,7 +149739,7 @@ and limitations under the License.
+@@ -147819,7 +149735,7 @@ and limitations under the License.
      }
      ((t.instantiate = function (e) {
        function t(t) {
@@ -54285,7 +54298,7 @@ index 411a842..90b4504 100644
        }
        r(t, e);
        for (var i = Object.keys(o), n = 0; n < i.length; n++) {
-@@ -147843,10 +149763,10 @@ and limitations under the License.
+@@ -147843,10 +149759,10 @@ and limitations under the License.
            a = r.iv;
          if ("encrypt" === this.type) {
            for (var s = 0; s < this.blockSize; s++) a[s] ^= e[t + s];
@@ -54298,7 +54311,7 @@ index 411a842..90b4504 100644
            for (s = 0; s < this.blockSize; s++) i[n + s] ^= a[s];
            for (s = 0; s < this.blockSize; s++) a[s] = e[t + s];
          }
-@@ -147896,7 +149816,7 @@ and limitations under the License.
+@@ -147896,7 +149812,7 @@ and limitations under the License.
              ];
      }
      function u(e) {
@@ -54307,7 +54320,7 @@ index 411a842..90b4504 100644
        var t = new c(this.type, this.options.key);
        this._edeState = t;
      }
-@@ -147923,7 +149843,7 @@ and limitations under the License.
+@@ -147923,7 +149839,7 @@ and limitations under the License.
        c = i(89),
        u = i(90);
      function l(e, t, i) {
@@ -54316,7 +54329,7 @@ index 411a842..90b4504 100644
          (this._cache = new f()),
          (this._cipher = new c.AES(t)),
          (this._prev = o.from(i)),
-@@ -148173,9 +150093,9 @@ and limitations under the License.
+@@ -148173,9 +150089,9 @@ and limitations under the License.
        c = i(89),
        u = i(90);
      function l(e, t, i) {
@@ -54328,7 +54341,7 @@ index 411a842..90b4504 100644
          (this._cipher = new c.AES(t)),
          (this._prev = r.from(i)),
          (this._mode = e),
-@@ -148305,7 +150225,7 @@ and limitations under the License.
+@@ -148305,7 +150221,7 @@ and limitations under the License.
            }),
          (t.createDiffieHellman = t.DiffieHellman =
            function t(i, r, s, c) {
@@ -54337,7 +54350,7 @@ index 411a842..90b4504 100644
                ? t(i, "binary", r, s)
                : ((r = r || "binary"),
                  (c = c || "binary"),
-@@ -148397,9 +150317,9 @@ and limitations under the License.
+@@ -148397,9 +150313,9 @@ and limitations under the License.
            (this.__prime = new n(e)),
            (this._prime = n.mont(this.__prime)),
            (this._primeLen = e.length),
@@ -54350,7 +54363,7 @@ index 411a842..90b4504 100644
            i
              ? ((this.setPublicKey = f), (this.setPrivateKey = d))
              : (this._primeCode = 8));
-@@ -148501,7 +150421,7 @@ and limitations under the License.
+@@ -148501,7 +150417,7 @@ and limitations under the License.
          s = i(584),
          c = i(201);
        function u(e) {
@@ -54359,7 +54372,7 @@ index 411a842..90b4504 100644
          var t = c[e];
          if (!t) throw new Error("Unknown message digest");
          ((this._hashType = t.hash),
-@@ -148510,7 +150430,7 @@ and limitations under the License.
+@@ -148510,7 +150426,7 @@ and limitations under the License.
            (this._signType = t.sign));
        }
        function l(e) {
@@ -54368,7 +54381,7 @@ index 411a842..90b4504 100644
          var t = c[e];
          if (!t) throw new Error("Unknown message digest");
          ((this._hash = n(t.hash)),
-@@ -148724,9 +150644,7 @@ and limitations under the License.
+@@ -148724,9 +150640,7 @@ and limitations under the License.
          name: "Fedor Indutny",
          email: "fedor@indutny.com",
        },
@@ -54379,7 +54392,7 @@ index 411a842..90b4504 100644
        dependencies: {
          "bn.js": "^4.4.0",
          brorand: "^1.0.1",
-@@ -148781,12 +150699,12 @@ and limitations under the License.
+@@ -148781,12 +150695,12 @@ and limitations under the License.
        r = i(11),
        o = i(25),
        a = i(214);
@@ -54398,7 +54411,7 @@ index 411a842..90b4504 100644
          for (var i = [], n = 1 << (t + 1), r = e.clone(); r.cmpn(1) >= 0; ) {
            var o;
            if (r.isOdd()) {
-@@ -148804,15 +150722,15 @@ and limitations under the License.
+@@ -148804,15 +150718,15 @@ and limitations under the License.
          }
          return i;
        }),
@@ -54420,7 +54433,7 @@ index 411a842..90b4504 100644
            (3 === c && (c = -1),
              3 === u && (u = -1),
              (o =
-@@ -148836,16 +150754,16 @@ and limitations under the License.
+@@ -148836,16 +150750,16 @@ and limitations under the License.
          }
          return i;
        }),
@@ -54441,7 +54454,7 @@ index 411a842..90b4504 100644
          return new r(e, "hex", "le");
        }));
    },
-@@ -148952,9 +150870,9 @@ and limitations under the License.
+@@ -148952,9 +150866,9 @@ and limitations under the License.
            ((s[h] = f.wnd), (c[h] = f.points));
          }
          for (h = n - 1; h >= 1; h -= 2) {
@@ -54454,7 +54467,7 @@ index 411a842..90b4504 100644
              var m = [t[d], null, null, t[p]];
              0 === t[d].y.cmp(t[p].y)
                ? ((m[1] = t[d].add(t[p])),
-@@ -148964,21 +150882,21 @@ and limitations under the License.
+@@ -148964,21 +150878,21 @@ and limitations under the License.
                    (m[2] = t[d].add(t[p].neg())))
                  : ((m[1] = t[d].toJ().mixedAdd(t[p])),
                    (m[2] = t[d].toJ().mixedAdd(t[p].neg())));
@@ -54482,7 +54495,7 @@ index 411a842..90b4504 100644
          }
          var E = this.jpoint(null, null, null),
            T = this._wnafT4;
-@@ -148992,13 +150910,14 @@ and limitations under the License.
+@@ -148992,13 +150906,14 @@ and limitations under the License.
            }
            if ((h >= 0 && A++, (E = E.dblp(A)), h < 0)) break;
            for (v = 0; v < n; v++) {
@@ -54501,7 +54514,7 @@ index 411a842..90b4504 100644
            }
          }
          for (h = 0; h < n; h++) c[h] = null;
-@@ -149106,7 +151025,7 @@ and limitations under the License.
+@@ -149106,7 +151021,7 @@ and limitations under the License.
        s = n.base,
        c = r.utils.assert;
      function u(e) {
@@ -54510,7 +54523,7 @@ index 411a842..90b4504 100644
          (this.a = new o(e.a, 16).toRed(this.red)),
          (this.b = new o(e.b, 16).toRed(this.red)),
          (this.tinv = this.two.redInvm()),
-@@ -149117,7 +151036,7 @@ and limitations under the License.
+@@ -149117,7 +151032,7 @@ and limitations under the License.
          (this._endoWnafT2 = new Array(4)));
      }
      function l(e, t, i, n) {
@@ -54519,7 +54532,7 @@ index 411a842..90b4504 100644
          null === t && null === i
            ? ((this.x = null), (this.y = null), (this.inf = true))
            : ((this.x = new o(t, 16)),
-@@ -149130,7 +151049,7 @@ and limitations under the License.
+@@ -149130,7 +151045,7 @@ and limitations under the License.
              (this.inf = false)));
      }
      function h(e, t, i, n) {
@@ -54528,7 +54541,7 @@ index 411a842..90b4504 100644
          null === t && null === i && null === n
            ? ((this.x = this.curve.one),
              (this.y = this.curve.one),
-@@ -149147,7 +151066,8 @@ and limitations under the License.
+@@ -149147,7 +151062,8 @@ and limitations under the License.
        (e.exports = u),
        (u.prototype._getEndomorphism = function (e) {
          if (this.zeroA && this.g && this.n && 1 === this.p.modn(3)) {
@@ -54538,7 +54551,7 @@ index 411a842..90b4504 100644
            if (e.beta) t = new o(e.beta, 16).toRed(this.red);
            else {
              var n = this._getEndoRoots(this.p);
-@@ -149222,7 +151142,7 @@ and limitations under the License.
+@@ -149222,7 +151138,7 @@ and limitations under the License.
                b: r,
              },
              {
@@ -54547,7 +54560,7 @@ index 411a842..90b4504 100644
                b: s,
              },
            ]
-@@ -149244,7 +151164,9 @@ and limitations under the License.
+@@ -149244,7 +151160,9 @@ and limitations under the License.
          };
        }),
        (u.prototype.pointFromX = function (e, t) {
@@ -54558,7 +54571,7 @@ index 411a842..90b4504 100644
          var i = e.redSqr().redMul(e).redIAdd(e.redMul(this.a)).redIAdd(this.b),
            n = i.redSqrt();
          if (0 !== n.redSqr().redSub(i).cmp(this.zero))
-@@ -149266,9 +151188,9 @@ and limitations under the License.
+@@ -149266,9 +151184,9 @@ and limitations under the License.
            o < e.length;
            o++
          ) {
@@ -54571,7 +54584,7 @@ index 411a842..90b4504 100644
            (a.k1.negative && (a.k1.ineg(), (s = s.neg(true))),
              a.k2.negative && (a.k2.ineg(), (c = c.neg(true))),
              (n[2 * o] = s),
-@@ -149293,10 +151215,10 @@ and limitations under the License.
+@@ -149293,10 +151211,10 @@ and limitations under the License.
            if (e && e.beta) return e.beta;
            var t = this.curve.point(this.x.redMul(this.curve.endo.beta), this.y);
            if (e) {
@@ -54586,7 +54599,7 @@ index 411a842..90b4504 100644
              ((e.beta = t),
                (t.precomputed = {
                  beta: null,
-@@ -149332,7 +151254,9 @@ and limitations under the License.
+@@ -149332,7 +151250,9 @@ and limitations under the License.
            : [this.x, this.y];
        }),
        (l.fromJSON = function (e, t, i) {
@@ -54597,7 +54610,7 @@ index 411a842..90b4504 100644
          var n = e.point(t[0], t[1], i);
          if (!t[2]) return n;
          function r(t) {
-@@ -149373,7 +151297,9 @@ and limitations under the License.
+@@ -149373,7 +151293,9 @@ and limitations under the License.
          if (this.neg().eq(e)) return this.curve.point(null, null);
          if (0 === this.x.cmp(e.x)) return this.curve.point(null, null);
          var t = this.y.redSub(e.y);
@@ -54608,7 +54621,7 @@ index 411a842..90b4504 100644
          var i = t.redSqr().redISub(this.x).redISub(e.x),
            n = t.redMul(this.x.redSub(i)).redISub(this.y);
          return this.curve.point(i, n);
-@@ -149431,10 +151357,10 @@ and limitations under the License.
+@@ -149431,10 +151353,10 @@ and limitations under the License.
          if (this.inf) return this;
          var t = this.curve.point(this.x, this.y.redNeg());
          if (e && this.precomputed) {
@@ -54623,7 +54636,7 @@ index 411a842..90b4504 100644
            t.precomputed = {
              naf: i.naf && {
                wnd: i.naf.wnd,
-@@ -149529,14 +151455,14 @@ and limitations under the License.
+@@ -149529,14 +151451,14 @@ and limitations under the License.
            c = s.redSqr().redSqr(),
            u = a.redAdd(a);
          for (i = 0; i < e; i++) {
@@ -54646,7 +54659,7 @@ index 411a842..90b4504 100644
            _ = _.redIAdd(_).redISub(f);
            var v = u.redMul(s);
            (i + 1 < e && (c = c.redMul(f)), (o = m), (s = v), (u = _));
-@@ -149555,27 +151481,27 @@ and limitations under the License.
+@@ -149555,27 +151477,27 @@ and limitations under the License.
        (h.prototype._zeroDbl = function () {
          var e, t, i;
          if (this.zOne) {
@@ -54688,7 +54701,7 @@ index 411a842..90b4504 100644
            ((g = (g = g.redIAdd(g)).redIAdd(g)),
              (e = m.redISub(d).redISub(d)),
              (t = p.redMul(d.redISub(e)).redISub(g)),
-@@ -149586,26 +151512,26 @@ and limitations under the License.
+@@ -149586,26 +151508,26 @@ and limitations under the License.
        (h.prototype._threeDbl = function () {
          var e, t, i;
          if (this.zOne) {
@@ -54727,7 +54740,7 @@ index 411a842..90b4504 100644
            ((e = d.redSqr().redISub(m)),
              (i = this.y.redAdd(this.z).redSqr().redISub(h).redISub(l)));
            var g = h.redSqr();
-@@ -149702,7 +151628,7 @@ and limitations under the License.
+@@ -149702,7 +151624,7 @@ and limitations under the License.
        a = n.base,
        s = i(17).utils;
      function c(e) {
@@ -54736,7 +54749,7 @@ index 411a842..90b4504 100644
          (this.a = new r(e.a, 16).toRed(this.red)),
          (this.b = new r(e.b, 16).toRed(this.red)),
          (this.i4 = new r(4).toRed(this.red).redInvm()),
-@@ -149710,7 +151636,7 @@ and limitations under the License.
+@@ -149710,7 +151632,7 @@ and limitations under the License.
          (this.a24 = this.i4.redMul(this.a.redAdd(this.two))));
      }
      function u(e, t, i) {
@@ -54745,7 +54758,7 @@ index 411a842..90b4504 100644
          null === t && null === i
            ? ((this.x = this.curve.one), (this.z = this.curve.zero))
            : ((this.x = new r(t, 16)),
-@@ -149821,7 +151747,7 @@ and limitations under the License.
+@@ -149821,7 +151743,7 @@ and limitations under the License.
        ((this.twisted = 1 != (0 | e.a)),
          (this.mOneA = this.twisted && -1 == (0 | e.a)),
          (this.extended = this.mOneA),
@@ -54754,7 +54767,7 @@ index 411a842..90b4504 100644
          (this.a = new o(e.a, 16).umod(this.red.m)),
          (this.a = this.a.toRed(this.red)),
          (this.c = new o(e.c, 16).toRed(this.red)),
-@@ -149832,7 +151758,7 @@ and limitations under the License.
+@@ -149832,7 +151754,7 @@ and limitations under the License.
          (this.oneC = 1 == (0 | e.c)));
      }
      function l(e, t, i, n, r) {
@@ -54763,7 +54776,7 @@ index 411a842..90b4504 100644
          null === t && null === i && null === n
            ? ((this.x = this.curve.zero),
              (this.y = this.curve.one),
-@@ -149865,7 +151791,9 @@ and limitations under the License.
+@@ -149865,7 +151787,9 @@ and limitations under the License.
          return this.point(e, t, i, n);
        }),
        (u.prototype.pointFromX = function (e, t) {
@@ -54774,7 +54787,7 @@ index 411a842..90b4504 100644
          var i = e.redSqr(),
            n = this.c2.redSub(this.a.redMul(i)),
            r = this.one.redSub(this.c2.redMul(this.d).redMul(i)),
-@@ -149877,7 +151805,9 @@ and limitations under the License.
+@@ -149877,7 +151801,9 @@ and limitations under the License.
          return (((t && !c) || (!t && c)) && (s = s.redNeg()), this.point(e, s));
        }),
        (u.prototype.pointFromY = function (e, t) {
@@ -54785,7 +54798,7 @@ index 411a842..90b4504 100644
          var i = e.redSqr(),
            n = i.redSub(this.c2),
            r = i.redMul(this.d).redMul(this.c2).redSub(this.a),
-@@ -149961,8 +151891,8 @@ and limitations under the License.
+@@ -149961,8 +151887,8 @@ and limitations under the License.
                (t = a.redMul(u.redSub(o))),
                (i = a.redSqr().redSub(a).redSub(a)));
            else {
@@ -54796,7 +54809,7 @@ index 411a842..90b4504 100644
              ((e = n.redSub(r).redISub(o).redMul(c)),
                (t = a.redMul(u.redSub(o))),
                (i = a.redMul(c)));
-@@ -150123,7 +152053,7 @@ and limitations under the License.
+@@ -150123,7 +152049,7 @@ and limitations under the License.
          },
        });
      }
@@ -54805,7 +54818,7 @@ index 411a842..90b4504 100644
        u("p192", {
          type: "short",
          prime: "p192",
-@@ -150223,7 +152153,7 @@ and limitations under the License.
+@@ -150223,7 +152149,7 @@ and limitations under the License.
      try {
        n = i(562);
      } catch (e) {
@@ -54814,7 +54827,7 @@ index 411a842..90b4504 100644
      }
      u("secp256k1", {
        type: "short",
-@@ -150276,7 +152206,7 @@ and limitations under the License.
+@@ -150276,7 +152202,7 @@ and limitations under the License.
        h = [1518500249, 1859775393, 2400959708, 3395469782];
      function f() {
        if (!(this instanceof f)) return new f();
@@ -54823,7 +54836,7 @@ index 411a842..90b4504 100644
          (this.h = [1732584193, 4023233417, 2562383102, 271733878, 3285377520]),
          (this.W = new Array(80)));
      }
-@@ -150296,8 +152226,8 @@ and limitations under the License.
+@@ -150296,8 +152222,8 @@ and limitations under the License.
            f = this.h[3],
            d = this.h[4];
          for (n = 0; n < i.length; n++) {
@@ -54834,7 +54847,7 @@ index 411a842..90b4504 100644
            ((d = f), (f = l), (l = a(o, 30)), (o = r), (r = m));
          }
          ((this.h[0] = s(this.h[0], r)),
-@@ -150318,7 +152248,7 @@ and limitations under the License.
+@@ -150318,7 +152244,7 @@ and limitations under the License.
        r = i(216);
      function o() {
        if (!(this instanceof o)) return new o();
@@ -54843,7 +54856,7 @@ index 411a842..90b4504 100644
          (this.h = [
            3238371032, 914150663, 812702999, 4144912697, 4290775857, 1750603025,
            1694076839, 3204075428,
-@@ -150342,7 +152272,7 @@ and limitations under the License.
+@@ -150342,7 +152268,7 @@ and limitations under the License.
        r = i(217);
      function o() {
        if (!(this instanceof o)) return new o();
@@ -54852,7 +54865,7 @@ index 411a842..90b4504 100644
          (this.h = [
            3418070365, 3238371032, 1654270250, 914150663, 2438529370, 812702999,
            355462360, 4144912697, 1731405415, 4290775857, 2394180231, 1750603025,
-@@ -150372,7 +152302,7 @@ and limitations under the License.
+@@ -150372,7 +152298,7 @@ and limitations under the License.
        u = r.BlockHash;
      function l() {
        if (!(this instanceof l)) return new l();
@@ -54861,7 +54874,7 @@ index 411a842..90b4504 100644
          (this.h = [1732584193, 4023233417, 2562383102, 271733878, 3285377520]),
          (this.endian = "little"));
      }
-@@ -151321,10 +153251,7 @@ and limitations under the License.
+@@ -151321,10 +153247,7 @@ and limitations under the License.
        ("string" == typeof e &&
          (s(a.curves.hasOwnProperty(e), "Unknown curve " + e),
          (e = a.curves[e])),
@@ -54873,7 +54886,7 @@ index 411a842..90b4504 100644
          (this.curve = e.curve.curve),
          (this.n = this.curve.n),
          (this.nh = this.n.ushrn(1)),
-@@ -151344,7 +153271,9 @@ and limitations under the License.
+@@ -151344,7 +153267,9 @@ and limitations under the License.
          return c.fromPublic(this, e, t);
        }),
        (l.prototype.genKeyPair = function (e) {
@@ -54884,7 +54897,7 @@ index 411a842..90b4504 100644
          for (
            var t = new o({
                hash: this.hash,
-@@ -151396,8 +153325,8 @@ and limitations under the License.
+@@ -151396,8 +153321,8 @@ and limitations under the License.
            ) {
              var m = this.g.mul(p);
              if (!m.isInfinity()) {
@@ -54895,7 +54908,7 @@ index 411a842..90b4504 100644
                if (0 !== _.cmpn(0)) {
                  var v = p.invm(this.n).mul(_.mul(t.getPrivate()).iadd(e));
                  if (0 !== (v = v.umod(this.n)).cmpn(0)) {
-@@ -151643,13 +153572,14 @@ and limitations under the License.
+@@ -151643,13 +153568,14 @@ and limitations under the License.
        o = r.assert;
      function a(e, t) {
        if (e instanceof a) return e;
@@ -54916,7 +54929,7 @@ index 411a842..90b4504 100644
      }
      function s() {
        this.place = 0;
-@@ -151806,18 +153736,10 @@ and limitations under the License.
+@@ -151806,18 +153732,10 @@ and limitations under the License.
          e.isPoint(t.pub) ? (this._pub = t.pub) : (this._pubBytes = o(t.pub)));
      }
      ((s.fromPublic = function (e, t) {
@@ -54937,7 +54950,7 @@ index 411a842..90b4504 100644
        }),
        (s.prototype.secret = function () {
          return this._secret;
-@@ -152023,9 +153945,7 @@ and limitations under the License.
+@@ -152023,9 +153941,7 @@ and limitations under the License.
      });
      t.ECPrivateKey = h;
      var f = n.define("ECParameters", function () {
@@ -54948,7 +54961,7 @@ index 411a842..90b4504 100644
      });
      t.signature = n.define("signature", function () {
        this.seq().obj(this.key("r").int(), this.key("s").int());
-@@ -152059,7 +153979,7 @@ and limitations under the License.
+@@ -152059,7 +153975,7 @@ and limitations under the License.
          return (
            r(t, e),
            (t.prototype._initNamed = function (t) {
@@ -54957,7 +54970,7 @@ index 411a842..90b4504 100644
            }),
            new t(this)
          );
-@@ -152187,16 +154107,22 @@ and limitations under the License.
+@@ -152187,16 +154103,22 @@ and limitations under the License.
            i[t] = e[t];
          }),
          forEach(globals, function (t) {
@@ -54983,7 +54996,7 @@ index 411a842..90b4504 100644
          }),
          document.body.removeChild(t),
          a
-@@ -152464,7 +154390,7 @@ and limitations under the License.
+@@ -152464,7 +154386,7 @@ and limitations under the License.
        (l.prototype._init = function (e) {
          var t = this._baseState;
          (s(null === t.parent),
@@ -54992,7 +55005,7 @@ index 411a842..90b4504 100644
            (t.children = t.children.filter(function (e) {
              return e._baseState.parent === this;
            }, this)),
-@@ -152492,7 +154418,9 @@ and limitations under the License.
+@@ -152492,7 +154414,9 @@ and limitations under the License.
                var t = {};
                return (
                  Object.keys(e).forEach(function (i) {
@@ -55003,7 +55016,7 @@ index 411a842..90b4504 100644
                    var n = e[i];
                    t[n] = i;
                  }),
-@@ -152741,7 +154669,7 @@ and limitations under the License.
+@@ -152741,7 +154665,7 @@ and limitations under the License.
              }
              return true;
            }, this),
@@ -55012,7 +55025,7 @@ index 411a842..90b4504 100644
          );
        }),
        (l.prototype._createEncoderBuffer = function (e) {
-@@ -152751,14 +154679,14 @@ and limitations under the License.
+@@ -152751,14 +154675,14 @@ and limitations under the License.
          var n = this._baseState;
          if (null === n.default || n.default !== e) {
            var r = this._encodeValue(e, t, i);
@@ -55029,7 +55042,7 @@ index 411a842..90b4504 100644
            if (null === o.default) return;
            e = o.default;
          }
-@@ -152802,8 +154730,8 @@ and limitations under the License.
+@@ -152802,8 +154726,8 @@ and limitations under the License.
              ? (a = this._getUse(o.use, i)._encode(e, t))
              : ((s = this._encodePrimitive(o.tag, e)), (c = true));
          if (!o.any && null === o.choice) {
@@ -55040,7 +55053,7 @@ index 411a842..90b4504 100644
            null === l
              ? null === o.use && t.error("Tag could be omitted only for .use()")
              : null === o.use && (a = this._encodeComposite(l, c, h, s));
-@@ -152891,14 +154819,14 @@ and limitations under the License.
+@@ -152891,14 +154815,14 @@ and limitations under the License.
    },
    function (e, t, i) {
      var n = t;
@@ -55057,7 +55070,7 @@ index 411a842..90b4504 100644
      }
      (n(a, o),
        (e.exports = a),
-@@ -152929,24 +154857,24 @@ and limitations under the License.
+@@ -152929,24 +154853,24 @@ and limitations under the License.
          var h = i.slice(s + 1, c).join("");
          h.replace(/[^a-z0-9\+\/=]+/gi, "");
          var f = new r(h, "base64");
@@ -55086,7 +55099,7 @@ index 411a842..90b4504 100644
              n = ["-----BEGIN " + t.label + "-----"],
              o = 0;
            o < i.length;
-@@ -152987,9 +154915,7 @@ and limitations under the License.
+@@ -152987,9 +154911,7 @@ and limitations under the License.
          this.seqof(c);
        }),
        l = n.define("Name", function () {
@@ -55097,7 +55110,7 @@ index 411a842..90b4504 100644
        }),
        h = n.define("Validity", function () {
          this.seq().obj(
-@@ -153057,12 +154983,12 @@ and limitations under the License.
+@@ -153057,12 +154979,12 @@ and limitations under the License.
            u = e.toString(),
            l = u.match(n);
          if (l) {
@@ -55116,7 +55129,7 @@ index 411a842..90b4504 100644
            (m.push(g.update(d)), m.push(g.final()), (c = t.concat(m)));
          } else {
            var _ = u.match(o);
-@@ -153192,15 +155118,14 @@ and limitations under the License.
+@@ -153192,15 +155114,14 @@ and limitations under the License.
        };
        function a(e) {
          ((this.curveType = o[e]),
@@ -55137,7 +55150,7 @@ index 411a842..90b4504 100644
          var r = new t(e);
          if (n && r.length < n) {
            var o = new t(n - r.length);
-@@ -153367,8 +155292,9 @@ and limitations under the License.
+@@ -153367,8 +155288,9 @@ and limitations under the License.
                ((e = l.from(e)), (t = l.from(t)));
                var i = 0,
                  n = e.length;
@@ -55148,7 +55161,7 @@ index 411a842..90b4504 100644
                var r = -1;
                for (; ++r < n; ) i += e[r] ^ t[r];
                return i;
-@@ -153376,9 +155302,9 @@ and limitations under the License.
+@@ -153376,9 +155298,9 @@ and limitations under the License.
            )
              throw new Error("decryption error");
            var d = a;
@@ -55160,7 +55173,7 @@ index 411a842..90b4504 100644
          })(d, f);
        if (1 === h)
          return (function (e, t, i) {
-@@ -153391,10 +155317,15 @@ and limitations under the License.
+@@ -153391,10 +155313,15 @@ and limitations under the License.
                break;
              }
            var a = t.slice(2, r - 1);
@@ -55179,7 +55192,7 @@ index 411a842..90b4504 100644
            if (o) throw new Error("decryption error");
            return t.slice(r);
          })(0, f, i);
-@@ -153430,8 +155361,8 @@ and limitations under the License.
+@@ -153430,8 +155357,8 @@ and limitations under the License.
        }
        function d(e, t, i, r) {
          if (n.browser) {
@@ -55190,7 +55203,7 @@ index 411a842..90b4504 100644
            return (
              u.getRandomValues(s),
              r
-@@ -153460,12 +155391,14 @@ and limitations under the License.
+@@ -153460,12 +155387,14 @@ and limitations under the License.
              return (h(i, t.length), f(n, i, t.length), d(t, i, n, r));
            }),
            (t.randomFillSync = function (t, i, n) {

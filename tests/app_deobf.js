@@ -67220,11 +67220,7 @@
 		t.publicEncrypt = l.publicEncrypt, t.privateEncrypt = l.privateEncrypt, t.publicDecrypt = l.publicDecrypt, t.privateDecrypt = l.privateDecrypt;
 		var h = i(589);
 		t.randomFill = h.randomFill, t.randomFillSync = h.randomFillSync, t.createCredentials = function() {
-			throw new Error([
-				"sorry, createCredentials is not implemented yet",
-				"we accept pull requests",
-				"https://github.com/crypto-browserify/crypto-browserify"
-			].join("\n"));
+			throw new Error("sorry, createCredentials is not implemented yet\nwe accept pull requests\nhttps://github.com/crypto-browserify/crypto-browserify");
 		}, t.constants = {
 			DH_CHECK_P_NOT_SAFE_PRIME: 2,
 			DH_CHECK_P_NOT_PRIME: 1,

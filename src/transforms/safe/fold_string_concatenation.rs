@@ -64,17 +64,95 @@ impl<'a> Visitor<'a> {
         Some(self.make_string_lit(bin.span, &joined))
     }
 
+    fn try_fold_join(&self, call: &CallExpression<'a>) -> Option<Expression<'a>> {
+        if call.optional {
+            return None;
+        }
+        let Expression::StaticMemberExpression(mem) = self.unwrap_parens(&call.callee) else {
+            return None;
+        };
+        if mem.property.name.as_str() != "join" {
+            return None;
+        }
+        let Expression::ArrayExpression(arr) = self.unwrap_parens(&mem.object) else {
+            return None;
+        };
+
+        // join separator
+        let sep = match call.arguments.len() {
+            0 => ",".to_string(),
+            1 => {
+                let arg0 = call.arguments.first()?.as_expression()?;
+                let Expression::StringLiteral(s) = self.unwrap_parens(arg0) else {
+                    return None;
+                };
+                s.value.as_str().to_string()
+            }
+            _ => return None,
+        };
+
+        let mut parts: Vec<String> = Vec::with_capacity(arr.elements.len());
+        for el in &arr.elements {
+            match el {
+                ArrayExpressionElement::Elision(_) => return None,
+                ArrayExpressionElement::SpreadElement(_) => return None,
+                _ => {
+                    let expr = el.as_expression()?;
+                    let Expression::StringLiteral(s) = self.unwrap_parens(expr) else {
+                        return None;
+                    };
+                    parts.push(s.value.as_str().to_string());
+                }
+            }
+        }
+
+        Some(self.make_string_lit(call.span, &parts.join(&sep)))
+    }
+
+    fn try_fold_concat(&self, call: &CallExpression<'a>) -> Option<Expression<'a>> {
+        if call.optional {
+            return None;
+        }
+        let Expression::StaticMemberExpression(mem) = self.unwrap_parens(&call.callee) else {
+            return None;
+        };
+        if mem.property.name.as_str() != "concat" {
+            return None;
+        }
+
+        let Expression::StringLiteral(base) = self.unwrap_parens(&mem.object) else {
+            return None;
+        };
+
+        let mut out = String::from(base.value.as_str());
+        for arg in &call.arguments {
+            let expr = arg.as_expression()?;
+            let Expression::StringLiteral(s) = self.unwrap_parens(expr) else {
+                return None;
+            };
+            out.push_str(s.value.as_str());
+        }
+        Some(self.make_string_lit(call.span, &out))
+    }
+
     fn fold_recursively(&mut self, expr: &mut Expression<'a>) {
         // First, recurse into children so we can fold chains like "a" + "b" + "c".
         oxc_ast_visit::walk_mut::walk_expression(self, expr);
 
-        let Expression::BinaryExpression(bin) = expr else {
-            return;
-        };
-
-        if let Some(repl) = self.try_fold_binary(bin) {
-            *expr = repl;
-            self.modified = true;
+        match expr {
+            Expression::BinaryExpression(bin) => {
+                if let Some(repl) = self.try_fold_binary(bin) {
+                    *expr = repl;
+                    self.modified = true;
+                }
+            }
+            Expression::CallExpression(call) => {
+                if let Some(repl) = self.try_fold_join(call).or_else(|| self.try_fold_concat(call)) {
+                    *expr = repl;
+                    self.modified = true;
+                }
+            }
+            _ => {}
         }
     }
 }

@@ -8,6 +8,7 @@ pub mod remove_redundant_block_statements;
 pub mod simplify_double_negation;
 pub mod simplify_jsfuck_booleans;
 pub mod fold_string_concatenation;
+pub mod fold_string_from_char_codes;
 pub mod simplify_calls;
 pub mod replace_function_return_this;
 pub mod simplify_module_factory_call;
