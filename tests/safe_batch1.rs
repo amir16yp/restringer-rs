@@ -722,6 +722,22 @@ fn simplify_babel_class_factory_iife_into_class() {
     let input = "function n(e, t) {\n  for (var i = 0; i < t.length; i++) {\n    var n = t[i];\n    n.enumerable = n.enumerable || false;\n    n.configurable = true;\n    \"value\" in n && (n.writable = true);\n    Object.defineProperty(e, n.key, n);\n  }\n}\nvar r = (function () {\n  function e() {\n    this.x = 1;\n  }\n  var t, i, r;\n  return (t = e), (r = [{ key: \"getInstance\", value: function () { return 1; } }]), (i = [{ key: \"m\", value: function () { return 2; } }]) && n(t.prototype, i), r && n(t, r), e;\n})();\n";
     let output = run(input);
     assert!(output.contains("class e") || output.contains("class E") || output.contains("class"));
-    assert!(output.contains("m()") || output.contains("m() {"));
+    assert!(output.contains("m()") || output.contains("m() {") );
     assert!(output.contains("static getInstance") || output.contains("static getInstance()"));
+}
+
+#[test]
+fn simplify_webpack_module_factory_es5_class_to_class_extends() {
+    let input = "(function(module, exports, __webpack_require__) { var n = __webpack_require__(1), r = __webpack_require__(221); function o(e) { r(e), this.enc = \"pem\"; } n(o, r), module.exports = o, o.prototype.encode = function(e, t) { for (var i = r.prototype.encode(e).toString(\"base64\"), n = [\"-----BEGIN \" + t.label + \"-----\"], o = 0; o < i.length; o += 64) n.push(i.slice(o, o + 64)); return n.push(\"-----END \" + t.label + \"-----\"), n.join(\"\\n\"); }; });";
+    let output = run(input);
+
+    // We expect: const requires, class extends, module.exports.
+    assert!(output.contains("const n = __webpack_require__(1)") || output.contains("const n=__webpack_require__(1)"));
+    assert!(output.contains("__webpack_require__(221)"));
+    assert!(output.contains("class o extends r") || output.contains("o.prototype.encode"));
+    assert!(output.contains("constructor") );
+    assert!(output.contains("this.enc = \"pem\"") || output.contains("this.enc=\"pem\""));
+    assert!(output.contains("encode(") );
+    assert!(output.contains("super.encode") || output.contains("r.prototype.encode"));
+    assert!(output.contains("module.exports = o") || output.contains("module.exports=o"));
 }

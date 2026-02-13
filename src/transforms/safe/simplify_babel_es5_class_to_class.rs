@@ -1,7 +1,7 @@
 use oxc_allocator::{Box as ArenaBox, CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
-use oxc_span::Span;
+use oxc_span::{ContentEq, Span};
 
 use std::collections::HashSet;
 
@@ -36,11 +36,215 @@ impl<'a> Visitor<'a> {
         }
     }
 
+    fn call_expr_args_are_all_param_idents(&self, call: &CallExpression<'a>, func: &Function<'a>) -> bool {
+        if call.arguments.len() != func.params.items.len() {
+            return false;
+        }
+        for (arg, param) in call.arguments.iter().zip(func.params.items.iter()) {
+            let Some(arg_expr) = arg.as_expression() else {
+                return false;
+            };
+            let Expression::Identifier(arg_id) = self.unwrap_parens(arg_expr) else {
+                return false;
+            };
+            let BindingPattern::BindingIdentifier(param_id) = &param.pattern else {
+                return false;
+            };
+            if arg_id.name.as_str() != param_id.name.as_str() {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn match_inherits_call(&self, class_names: &HashSet<String>, stmt: &Statement<'a>) -> Option<Expression<'a>> {
+        // Pattern: helper(Sub, Super);
+        // Only accept if Sub is in class_names.
+        let Statement::ExpressionStatement(es) = stmt else {
+            return None;
+        };
+        let Expression::CallExpression(call) = self.unwrap_parens(&es.expression) else {
+            return None;
+        };
+        let Expression::Identifier(_callee_id) = self.unwrap_parens(&call.callee) else {
+            return None;
+        };
+        if call.arguments.len() != 2 {
+            return None;
+        }
+        let Some(arg0) = call.arguments[0].as_expression() else {
+            return None;
+        };
+        let Some(arg1) = call.arguments[1].as_expression() else {
+            return None;
+        };
+        let Expression::Identifier(sub_id) = self.unwrap_parens(arg0) else {
+            return None;
+        };
+        if !class_names.contains(sub_id.name.as_str()) {
+            return None;
+        }
+        Some(arg1.clone_in(self.allocator))
+    }
+
+    fn rewrite_constructor_super_call(&self, func: &Function<'a>, super_expr: &Expression<'a>) -> Function<'a> {
+        // Pattern: function C(a,b){ Super(a,b); ... }
+        // Rewrite first statement into `super(a,b);`.
+        let mut out = func.clone_in(self.allocator);
+        let Some(body) = out.body.as_mut() else {
+            return out;
+        };
+        if body.statements.is_empty() {
+            return out;
+        }
+        let Statement::ExpressionStatement(es) = &body.statements[0] else {
+            return out;
+        };
+        let Expression::CallExpression(call) = self.unwrap_parens(&es.expression) else {
+            return out;
+        };
+        if !self.call_expr_args_are_all_param_idents(call, func) {
+            return out;
+        }
+        if !super_expr.content_eq(&call.callee) {
+            return out;
+        }
+
+        let super_callee = Expression::Super(ArenaBox::new_in(Super { span: call.span }, self.allocator));
+        let new_call = Expression::CallExpression(ArenaBox::new_in(
+            CallExpression {
+                span: call.span,
+                callee: super_callee,
+                type_arguments: None,
+                arguments: call.arguments.clone_in(self.allocator),
+                optional: false,
+                pure: call.pure,
+            },
+            self.allocator,
+        ));
+
+        body.statements[0] = Statement::ExpressionStatement(ArenaBox::new_in(
+            ExpressionStatement { span: es.span, expression: new_call },
+            self.allocator,
+        ));
+
+        out
+    }
+
     fn is_identifier_ref_named(&self, expr: &Expression<'a>, name: &str) -> bool {
         let Expression::Identifier(id) = self.unwrap_parens(expr) else {
             return false;
         };
         id.name.as_str() == name
+    }
+
+    fn match_module_exports_assign(&self, class_names: &HashSet<String>, stmt: &Statement<'a>) -> bool {
+        // Pattern: module.exports = C;
+        let Statement::ExpressionStatement(es) = stmt else {
+            return false;
+        };
+        let Expression::AssignmentExpression(ae) = self.unwrap_parens(&es.expression) else {
+            return false;
+        };
+        if ae.operator != AssignmentOperator::Assign {
+            return false;
+        }
+        let AssignmentTarget::StaticMemberExpression(mem) = &ae.left else {
+            return false;
+        };
+        let Expression::Identifier(obj) = self.unwrap_parens(&mem.object) else {
+            return false;
+        };
+        if obj.name.as_str() != "module" {
+            return false;
+        }
+        if mem.property.name.as_str() != "exports" {
+            return false;
+        }
+        let Expression::Identifier(rhs_id) = self.unwrap_parens(&ae.right) else {
+            return false;
+        };
+        class_names.contains(rhs_id.name.as_str())
+    }
+
+    fn rewrite_super_prototype_member_in_function(&self, func: &mut Function<'a>, super_expr: &Expression<'a>) {
+        // Rewrite `Super.prototype.x` to `super.x` in this function body.
+        let Expression::Identifier(super_id) = self.unwrap_parens(super_expr) else {
+            return;
+        };
+        let super_name = super_id.name.as_str();
+
+        let Some(body) = func.body.as_mut() else {
+            return;
+        };
+
+        struct Rewriter<'a> {
+            allocator: &'a oxc_allocator::Allocator,
+            super_name: &'a str,
+            modified: bool,
+        }
+
+        impl<'a> Rewriter<'a> {
+            fn unwrap_parens_mut<'b>(&self, mut expr: &'b mut Expression<'a>) -> &'b mut Expression<'a> {
+                loop {
+                    match expr {
+                        Expression::ParenthesizedExpression(p) => expr = &mut p.expression,
+                        _ => return expr,
+                    }
+                }
+            }
+
+            fn try_rewrite_member(&mut self, expr: &mut Expression<'a>) {
+                let Expression::StaticMemberExpression(outer) = self.unwrap_parens_mut(expr) else {
+                    return;
+                };
+                let Expression::StaticMemberExpression(inner) = &outer.object else {
+                    return;
+                };
+                if inner.property.name.as_str() != "prototype" {
+                    return;
+                }
+                let Expression::Identifier(obj_id) = &inner.object else {
+                    return;
+                };
+                if obj_id.name.as_str() != self.super_name {
+                    return;
+                }
+
+                // Turn `Super.prototype.x` into `super.x`
+                let super_expr = Expression::Super(ArenaBox::new_in(Super { span: outer.span }, self.allocator));
+                let new_mem = Expression::StaticMemberExpression(ArenaBox::new_in(
+                    StaticMemberExpression {
+                        span: outer.span,
+                        object: super_expr,
+                        property: outer.property.clone_in(self.allocator),
+                        optional: false,
+                    },
+                    self.allocator,
+                ));
+                *expr = new_mem;
+                self.modified = true;
+            }
+        }
+
+        impl<'a> VisitMut<'a> for Rewriter<'a> {
+            fn visit_expression(&mut self, it: &mut Expression<'a>) {
+                self.try_rewrite_member(it);
+                oxc_ast_visit::walk_mut::walk_expression(self, it);
+            }
+
+            fn visit_function(&mut self, _it: &mut Function<'a>, _flags: oxc_syntax::scope::ScopeFlags) {
+                // Don't descend into nested functions.
+            }
+
+            fn visit_arrow_function_expression(&mut self, _it: &mut ArrowFunctionExpression<'a>) {
+                // Don't descend into nested arrows.
+            }
+        }
+
+        let mut r = Rewriter { allocator: self.allocator, super_name, modified: false };
+        r.visit_function_body(body);
+        let _ = r.modified;
     }
 
     fn match_proto_assignment(
@@ -142,10 +346,23 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn method_from_function(&self, span: Span, key: IdentifierName<'a>, func: &Function<'a>, is_static: bool) -> ClassElement<'a> {
+    fn method_from_function(
+        &self,
+        span: Span,
+        key: IdentifierName<'a>,
+        func: &Function<'a>,
+        is_static: bool,
+        super_class: Option<&Expression<'a>>,
+    ) -> ClassElement<'a> {
         let mut f = func.clone_in(self.allocator);
         f.id = None;
         f.r#type = FunctionType::FunctionExpression;
+
+        if !is_static {
+            if let Some(sc) = super_class {
+                self.rewrite_super_prototype_member_in_function(&mut f, sc);
+            }
+        }
 
         let md = MethodDefinition {
             span,
@@ -217,8 +434,13 @@ impl<'a> Visitor<'a> {
             let mut class_names: HashSet<String> = HashSet::new();
             class_names.insert(class_name.to_string());
 
+            let mut super_class: Option<Expression<'a>> = None;
+
             let mut elements = ArenaVec::new_in(self.allocator);
+            // Constructor may be rewritten later if we find an inherits call.
             elements.push(self.constructor_from_function(func.span, func));
+
+            let mut trailing_export_stmts: ArenaVec<'a, Statement<'a>> = ArenaVec::new_in(self.allocator);
 
             let mut j = i + 1;
             let mut consumed_any = false;
@@ -262,6 +484,14 @@ impl<'a> Visitor<'a> {
                 }
             }
 
+            // Look for a simple inherits call next: helper(C, Super);
+            if j < original.len() {
+                if let Some(sc) = self.match_inherits_call(&class_names, &original[j]) {
+                    super_class = Some(sc);
+                    j += 1;
+                }
+            }
+
             while j < original.len() {
                 // Skip temp array assignments like `i = [ ... ];` which are only used to feed helper calls.
                 if let Statement::ExpressionStatement(es) = &original[j] {
@@ -279,11 +509,18 @@ impl<'a> Visitor<'a> {
                     break;
                 };
 
+                // Allow `module.exports = C;` to appear before prototype assignments.
+                if self.match_module_exports_assign(&class_names, &original[j]) {
+                    trailing_export_stmts.push(original[j].clone_in(self.allocator));
+                    j += 1;
+                    continue;
+                }
+
                 let Some((span, key, rhs_func, is_static)) = self.match_proto_assignment(&class_names, &es.expression) else {
                     break;
                 };
 
-                elements.push(self.method_from_function(span, key, &rhs_func, is_static));
+                elements.push(self.method_from_function(span, key, &rhs_func, is_static, super_class.as_ref()));
                 consumed_any = true;
                 j += 1;
             }
@@ -294,6 +531,13 @@ impl<'a> Visitor<'a> {
                 continue;
             }
 
+            // If we detected `extends`, rewrite the constructor's leading `Super(...)` call into `super(...)`.
+            if let Some(sc) = super_class.as_ref() {
+                let rewritten_ctor = self.rewrite_constructor_super_call(func, sc);
+                elements[0] = self.constructor_from_function(func.span, &rewritten_ctor);
+                self.modified = true;
+            }
+
             let class_body = ClassBody { span: func.span, body: elements };
             let class = Class {
                 span: func.span,
@@ -301,7 +545,7 @@ impl<'a> Visitor<'a> {
                 decorators: ArenaVec::new_in(self.allocator),
                 id: Some(id.clone_in(self.allocator)),
                 type_parameters: None,
-                super_class: None,
+                super_class,
                 super_type_arguments: None,
                 implements: ArenaVec::new_in(self.allocator),
                 body: ArenaBox::new_in(class_body, self.allocator),
@@ -311,6 +555,10 @@ impl<'a> Visitor<'a> {
             };
 
             out.push(Statement::ClassDeclaration(ArenaBox::new_in(class, self.allocator)));
+
+            for s in trailing_export_stmts {
+                out.push(s);
+            }
 
             self.modified = true;
             i = j;
