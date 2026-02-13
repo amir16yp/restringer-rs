@@ -143,6 +143,16 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
         if let Expression::CallExpression(call) = it {
             if let Some(method) = self.method_name(&call.callee) {
                 if self.allowed_context_arg(call) {
+                    // `f.call(this)` cannot be safely rewritten to `f()` because it changes the `this` binding.
+                    // This breaks cases like `Function.toString.call(this)`.
+                    if method == "call" && call.arguments.len() == 1 {
+                        if let Some(arg0) = call.arguments.first().and_then(|a| a.as_expression()) {
+                            if matches!(self.unwrap_parens(arg0), Expression::ThisExpression(_)) {
+                                oxc_ast_visit::walk_mut::walk_expression(self, it);
+                                return;
+                            }
+                        }
+                    }
                     if let Some(obj) = self.member_object(&call.callee) {
                         if !self.callee_is_excluded(obj) {
                             let new_callee = obj.clone_in(self.allocator);

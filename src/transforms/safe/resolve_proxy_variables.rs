@@ -32,6 +32,12 @@ impl<'a> Visitor<'a> {
     fn collect_proxy_declarators_from_statement_list(&mut self, stmts: &[Statement<'a>]) {
         for stmt in stmts {
             let Statement::VariableDeclaration(var_decl) = stmt else { continue; };
+
+            // Be conservative: only treat `const proxy = target;` as an alias.
+            // `var`/`let` are often used in polyfills and can be reassigned; rewriting them can break semantics.
+            if var_decl.kind != VariableDeclarationKind::Const {
+                continue;
+            }
             for decl in &var_decl.declarations {
                 let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue; };
                 let Some(init) = decl.init.as_ref() else { continue; };
@@ -39,6 +45,9 @@ impl<'a> Visitor<'a> {
 
                 let proxy_name = binding.name.as_str();
                 let target_name = target.name.as_str();
+                if target_name == "undefined" {
+                    continue;
+                }
                 if proxy_name != target_name {
                     self.map.insert(proxy_name.to_string(), target_name.to_string());
                 }

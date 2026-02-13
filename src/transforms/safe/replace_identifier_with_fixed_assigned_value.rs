@@ -62,6 +62,13 @@ impl<'a> Visitor<'a> {
         let mut out = HashMap::new();
         for stmt in stmts {
             let Statement::VariableDeclaration(var_decl) = stmt else { continue; };
+
+            // Be conservative: only inline literals from `const` declarations.
+            // `var`/`let` bindings can be reassigned from nested closures, which this pass does not
+            // track precisely, and inlining can break semantics.
+            if var_decl.kind != VariableDeclarationKind::Const {
+                continue;
+            }
             for decl in &var_decl.declarations {
                 let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue; };
                 let Some(init) = decl.init.as_ref() else { continue; };

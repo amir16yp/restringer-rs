@@ -227,7 +227,52 @@ impl<'a> Visitor<'a> {
                         return true;
                     }
                 }
-                func.params.items.iter().any(|p| matches!(&p.pattern, BindingPattern::BindingIdentifier(id) if id.name.as_str() == self.from))
+                if func
+                    .params
+                    .items
+                    .iter()
+                    .any(|p| matches!(&p.pattern, BindingPattern::BindingIdentifier(id) if id.name.as_str() == self.from))
+                {
+                    return true;
+                }
+
+                // Also treat declarations in the function body as shadowing.
+                // This is critical when normalizing webpack factory require param names like `i`:
+                // nested code (e.g. regenerator-runtime) often declares `function i(...) {}` as a helper,
+                // and we must not rewrite uses of that local binding.
+                let Some(body) = func.body.as_ref() else {
+                    return false;
+                };
+                for stmt in &body.statements {
+                    match stmt {
+                        Statement::FunctionDeclaration(fd) => {
+                            if let Some(id) = (**fd).id.as_ref() {
+                                if id.name.as_str() == self.from {
+                                    return true;
+                                }
+                            }
+                        }
+                        Statement::ClassDeclaration(cd) => {
+                            if let Some(id) = (**cd).id.as_ref() {
+                                if id.name.as_str() == self.from {
+                                    return true;
+                                }
+                            }
+                        }
+                        Statement::VariableDeclaration(vd) => {
+                            for decl in &vd.declarations {
+                                if let BindingPattern::BindingIdentifier(id) = &decl.id {
+                                    if id.name.as_str() == self.from {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                false
             }
 
             fn arrow_shadows_name(&self, arrow: &ArrowFunctionExpression<'a>) -> bool {
@@ -240,13 +285,6 @@ impl<'a> Visitor<'a> {
         }
 
         impl<'a> VisitMut<'a> for Renamer<'a> {
-            fn visit_binding_identifier(&mut self, it: &mut BindingIdentifier<'a>) {
-                if it.name.as_str() == self.from {
-                    let name = self.allocator.alloc_str(self.to);
-                    it.name = name.into();
-                }
-            }
-
             fn visit_expression(&mut self, it: &mut Expression<'a>) {
                 match self.unwrap_parens_mut(it) {
                     Expression::Identifier(id) => {
@@ -302,6 +340,43 @@ impl<'a> Visitor<'a> {
         Some((p0.name.as_str(), p1.name.as_str(), p2.name.as_str()))
     }
 
+    fn function_body_declares_binding_named(&self, func: &Function<'a>, name: &str) -> bool {
+        let Some(body) = func.body.as_ref() else {
+            return false;
+        };
+
+        for stmt in &body.statements {
+            match stmt {
+                Statement::FunctionDeclaration(fd) => {
+                    if let Some(id) = (**fd).id.as_ref() {
+                        if id.name.as_str() == name {
+                            return true;
+                        }
+                    }
+                }
+                Statement::ClassDeclaration(cd) => {
+                    if let Some(id) = (**cd).id.as_ref() {
+                        if id.name.as_str() == name {
+                            return true;
+                        }
+                    }
+                }
+                Statement::VariableDeclaration(vd) => {
+                    for decl in &vd.declarations {
+                        if let BindingPattern::BindingIdentifier(id) = &decl.id {
+                            if id.name.as_str() == name {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        false
+    }
+
     fn maybe_normalize_factory_params(&mut self, func: &mut Function<'a>) {
         let Some((p0, p1, p2)) = self.function_looks_like_webpack_module_factory(func) else {
             return;
@@ -330,8 +405,13 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        // Only normalize param2 to `__webpack_require__` if the 3rd parameter is used like a webpack require function.
-        if self.function_uses_require_like_call_in_body(func, p2) {
+        // Only normalize param2 to `__webpack_require__` if:
+        // - it is used like a webpack require function, AND
+        // - it isn't redeclared in the module factory body (e.g. `function i(...) {}`), which would make
+        //   renaming corrupt unrelated code and can crash at runtime.
+        if self.function_uses_require_like_call_in_body(func, p2)
+            && !self.function_body_declares_binding_named(func, p2)
+        {
             if p2 != "__webpack_require__" && !self.function_contains_binding_named(func, "__webpack_require__") {
                 if let Some(from) = self.rename_function_param_binding(func, 2, "__webpack_require__") {
                     self.rename_identifier_in_function_body(func, from, "__webpack_require__");
