@@ -635,3 +635,19 @@ fn simplify_module_factory_call_rewrites_call_undefined_thisarg() {
     assert!(!output.contains(".call(undefined"));
     assert!(output.contains("f(1, 2)") || output.contains("f(1,2)") || output.contains("1 + 2") || output.contains("1+2"));
 }
+
+#[test]
+fn unwrap_webpack_bootstrap_unwraps_bang_iife() {
+    let input = "!function(){\nconsole.log(1);\n}();\n";
+    let output = run(input);
+    assert!(!output.contains("!function"));
+    assert!(output.contains("console.log"));
+}
+
+#[test]
+fn unwrap_webpack_bootstrap_renames_require_fn_to_webpack_require() {
+    let input = "!function(e){\nfunction r(i){ return i; }\nreturn r((r.s = 228));\n}([]);\n";
+    let output = run(input);
+    assert!(output.contains("__webpack_require__"));
+    assert!(!output.contains("return r("));
+}
