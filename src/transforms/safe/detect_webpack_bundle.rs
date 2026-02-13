@@ -283,21 +283,12 @@ impl<'a> Visitor<'a> {
             return;
         };
 
-        // Only normalize if the 3rd parameter is used like a webpack require function.
-        if !self.function_uses_require_like_call_in_body(func, p2) {
-            return;
-        }
-
         // Normalize parameter bindings + their uses.
         // Important: to keep semantics, we must rename the *binding identifier* too, not only references.
-
-        // param2: require
-        if p2 != "__webpack_require__" && !self.function_contains_binding_named(func, "__webpack_require__") {
-            if let Some(from) = self.rename_function_param_binding(func, 2, "__webpack_require__") {
-                self.rename_identifier_in_function_body(func, from, "__webpack_require__");
-                self.modified = true;
-            }
-        }
+        //
+        // We always try to normalize param0/param1 (`module`/`exports`) when safe.
+        // This avoids strict-mode SyntaxErrors where a top-level `class e {}` (or `let e`) collides with
+        // a factory parameter named `e`.
 
         // param0: module
         if p0 != "module" && !self.function_contains_binding_named(func, "module") {
@@ -312,6 +303,16 @@ impl<'a> Visitor<'a> {
             if let Some(from) = self.rename_function_param_binding(func, 1, "exports") {
                 self.rename_identifier_in_function_body(func, from, "exports");
                 self.modified = true;
+            }
+        }
+
+        // Only normalize param2 to `__webpack_require__` if the 3rd parameter is used like a webpack require function.
+        if self.function_uses_require_like_call_in_body(func, p2) {
+            if p2 != "__webpack_require__" && !self.function_contains_binding_named(func, "__webpack_require__") {
+                if let Some(from) = self.rename_function_param_binding(func, 2, "__webpack_require__") {
+                    self.rename_identifier_in_function_body(func, from, "__webpack_require__");
+                    self.modified = true;
+                }
             }
         }
     }

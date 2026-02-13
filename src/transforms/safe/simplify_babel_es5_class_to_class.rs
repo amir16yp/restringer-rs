@@ -68,6 +68,42 @@ impl<'a> Visitor<'a> {
         candidate
     }
 
+    fn record_declared_names_in_stmt(&self, stmt: &Statement<'a>, out: &mut HashSet<String>) {
+        match stmt {
+            Statement::FunctionDeclaration(fd) => {
+                if let Some(id) = (**fd).id.as_ref() {
+                    out.insert(id.name.as_str().to_string());
+                }
+            }
+            Statement::ClassDeclaration(cd) => {
+                if let Some(id) = (**cd).id.as_ref() {
+                    out.insert(id.name.as_str().to_string());
+                }
+            }
+            Statement::VariableDeclaration(vd) => {
+                for decl in &vd.declarations {
+                    if let BindingPattern::BindingIdentifier(id) = &decl.id {
+                        out.insert(id.name.as_str().to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn make_safe_class_name_from_sets(&self, desired: &str, reserved: Option<&HashSet<String>>, declared: &HashSet<String>) -> String {
+        let mut name = self.make_safe_class_name(desired, reserved);
+        if !declared.contains(&name) {
+            return name;
+        }
+        let mut candidate = format!("_{name}");
+        while declared.contains(&candidate) {
+            candidate = format!("_{candidate}");
+        }
+        name = candidate;
+        name
+    }
+
     fn rename_identifier_references_in_statement_list(
         &self,
         stmts: &mut ArenaVec<'a, Statement<'a>>,
@@ -611,19 +647,27 @@ impl<'a> Visitor<'a> {
         let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let mut out = ArenaVec::new_in(self.allocator);
 
+        // Track identifiers already declared in this statement list scope.
+        // This avoids emitting `class e {}` after earlier `function e(){}` / `var e = ...` in the same scope.
+        let mut declared_names: HashSet<String> = HashSet::new();
+
         let mut i = 0;
         while i < original.len() {
             let stmt = &original[i];
 
             let Statement::FunctionDeclaration(fd) = stmt else {
-                out.push(original[i].clone_in(self.allocator));
+                let cloned = original[i].clone_in(self.allocator);
+                self.record_declared_names_in_stmt(&cloned, &mut declared_names);
+                out.push(cloned);
                 i += 1;
                 continue;
             };
 
             let func = &**fd;
             let Some(id) = func.id.as_ref() else {
-                out.push(original[i].clone_in(self.allocator));
+                let cloned = original[i].clone_in(self.allocator);
+                self.record_declared_names_in_stmt(&cloned, &mut declared_names);
+                out.push(cloned);
                 i += 1;
                 continue;
             };
@@ -762,7 +806,9 @@ impl<'a> Visitor<'a> {
             }
 
             if !consumed_any {
-                out.push(original[i].clone_in(self.allocator));
+                let cloned = original[i].clone_in(self.allocator);
+                self.record_declared_names_in_stmt(&cloned, &mut declared_names);
+                out.push(cloned);
                 i += 1;
                 continue;
             }
@@ -776,7 +822,7 @@ impl<'a> Visitor<'a> {
 
             let reserved = self.current_reserved_param_names();
             let original_name = id.name.as_str();
-            let safe_name = self.make_safe_class_name(original_name, reserved);
+            let safe_name = self.make_safe_class_name_from_sets(original_name, reserved, &declared_names);
             let mut class_id = id.clone_in(self.allocator);
             if safe_name != original_name {
                 let safe_alloc = self.allocator.alloc_str(&safe_name);
@@ -800,6 +846,8 @@ impl<'a> Visitor<'a> {
             };
 
             out.push(Statement::ClassDeclaration(ArenaBox::new_in(class, self.allocator)));
+
+            declared_names.insert(safe_name.clone());
 
             if safe_name != original_name {
                 // Update references in any trailing statements we preserved (e.g. `module.exports = C;`).
