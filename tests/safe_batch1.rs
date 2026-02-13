@@ -694,6 +694,7 @@ fn simplify_babel_class_helpers_inlines_simple_descriptor_array_to_assignments()
             || output.contains("C.prototype.m")
             || output.contains("C.prototype[\"m\"]")
             || output.contains("C.prototype['m']")
+            || (output.contains("class C") && (output.contains("m()") || output.contains("m() {")))
     );
 }
 
@@ -703,4 +704,24 @@ fn simplify_babel_class_helpers_inlines_static_props() {
     let output = run(input);
     assert!(!output.contains("Object.defineProperty(C"));
     assert!(output.contains("C.x") || output.contains("C[\"x\"]") || output.contains("C['x']"));
+}
+
+#[test]
+fn simplify_babel_es5_class_to_class_rewrites_prototype_and_static_methods() {
+    let input = "function n(e,t){for(var i=0;i<t.length;i++){var n=t[i];Object.defineProperty(e,n.key,n);}}\nfunction C(){return 1;}\nn(C.prototype,[{key:\"m\",value:function(){return 2;}}]);\nn(C,[{key:\"s\",value:function(){return 3;}}]);\n";
+    let output = run(input);
+    assert!(output.contains("class C"));
+    assert!(output.contains("constructor") || output.contains("constructor()"));
+    assert!(output.contains("m()") || output.contains("m() {"));
+    assert!(output.contains("static s") || output.contains("static s()"));
+    assert!(!output.contains("C.prototype"));
+}
+
+#[test]
+fn simplify_babel_class_factory_iife_into_class() {
+    let input = "function n(e, t) {\n  for (var i = 0; i < t.length; i++) {\n    var n = t[i];\n    n.enumerable = n.enumerable || false;\n    n.configurable = true;\n    \"value\" in n && (n.writable = true);\n    Object.defineProperty(e, n.key, n);\n  }\n}\nvar r = (function () {\n  function e() {\n    this.x = 1;\n  }\n  var t, i, r;\n  return (t = e), (r = [{ key: \"getInstance\", value: function () { return 1; } }]), (i = [{ key: \"m\", value: function () { return 2; } }]) && n(t.prototype, i), r && n(t, r), e;\n})();\n";
+    let output = run(input);
+    assert!(output.contains("class e") || output.contains("class E") || output.contains("class"));
+    assert!(output.contains("m()") || output.contains("m() {"));
+    assert!(output.contains("static getInstance") || output.contains("static getInstance()"));
 }
