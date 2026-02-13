@@ -4870,7 +4870,7 @@
 										for (var t = 0; t < e.length; t++) {
 											var i;
 											var n = e[t];
-											(i = n).func.apply(i, isLocalPlayer(n.args));
+											(i = n).func.apply(i, n.args);
 										}
 										he = k.time;
 									}
@@ -4880,7 +4880,7 @@
 										for (var t = 0; t < e.length; t++) {
 											var r;
 											var n = e[t];
-											(r = n).func.apply(r, isLocalPlayer(n.args));
+											(r = n).func.apply(r, n.args);
 										}
 										me = k.time;
 									}

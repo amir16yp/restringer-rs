@@ -4,6 +4,7 @@ use oxc_ast_visit::VisitMut;
 use oxc_span::{ContentEq, Span};
 
 use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::{Transform, TransformCtx};
 
@@ -34,6 +35,132 @@ impl<'a> Visitor<'a> {
                 _ => return expr,
             }
         }
+    }
+
+    fn descriptor_key_value<'b>(
+        &self,
+        obj: &'b ObjectExpression<'a>,
+    ) -> Option<(&'b StringLiteral<'a>, &'b Function<'a>)> {
+        // Accept minimal Babel descriptors: { key: "x", value: function(...) { ... } }
+        // Ignore common flags (enumerable/configurable/writable).
+        // Reject accessors or extra fields.
+        let mut key: Option<&StringLiteral<'a>> = None;
+        let mut value: Option<&Function<'a>> = None;
+
+        for prop in &obj.properties {
+            let ObjectPropertyKind::ObjectProperty(p) = prop else {
+                return None;
+            };
+            let PropertyKey::StaticIdentifier(ident) = &p.key else {
+                return None;
+            };
+            match ident.name.as_str() {
+                "key" => {
+                    let Expression::StringLiteral(s) = self.unwrap_parens(&p.value) else {
+                        return None;
+                    };
+                    key = Some(s);
+                }
+                "value" => {
+                    let Expression::FunctionExpression(f) = self.unwrap_parens(&p.value) else {
+                        return None;
+                    };
+                    value = Some(&**f);
+                }
+                "enumerable" | "configurable" | "writable" => {
+                    // ignore
+                }
+                "get" | "set" => {
+                    return None;
+                }
+                _ => {
+                    return None;
+                }
+            }
+        }
+
+        Some((key?, value?))
+    }
+
+    fn method_from_descriptor(
+        &self,
+        span: Span,
+        key_lit: &StringLiteral<'a>,
+        func: &Function<'a>,
+        is_static: bool,
+        super_class: Option<&Expression<'a>>,
+    ) -> Option<ClassElement<'a>> {
+        let key_str = key_lit.value.as_str();
+        if key_str.is_empty() {
+            return None;
+        }
+        let key = IdentifierName { span: key_lit.span, name: self.allocator.alloc_str(key_str).into() };
+        Some(self.method_from_function(span, key, func, is_static, super_class))
+    }
+
+    fn is_proto_of_class_alias(&self, class_names: &HashSet<String>, expr: &Expression<'a>) -> Option<String> {
+        // Match: <Alias>.prototype
+        let Expression::StaticMemberExpression(mem) = self.unwrap_parens(expr) else {
+            return None;
+        };
+        if mem.property.name.as_str() != "prototype" {
+            return None;
+        }
+        let Expression::Identifier(obj) = self.unwrap_parens(&mem.object) else {
+            return None;
+        };
+        if !class_names.contains(obj.name.as_str()) {
+            return None;
+        }
+        Some(obj.name.as_str().to_string())
+    }
+
+    fn is_class_alias_ident(&self, class_names: &HashSet<String>, expr: &Expression<'a>) -> Option<String> {
+        let Expression::Identifier(id) = self.unwrap_parens(expr) else {
+            return None;
+        };
+        if !class_names.contains(id.name.as_str()) {
+            return None;
+        }
+        Some(id.name.as_str().to_string())
+    }
+
+    fn match_define_properties_helper_call(
+        &self,
+        class_names: &HashSet<String>,
+        array_assigns: &HashMap<String, ArenaBox<'a, ArrayExpression<'a>>>,
+        expr: &Expression<'a>,
+    ) -> Option<(Span, bool, ArenaBox<'a, ArrayExpression<'a>>)> {
+        // Match: helper(<Alias>.prototype, arr) OR helper(<Alias>, arr)
+        // where arr is an array literal OR an identifier previously assigned an array literal.
+        let Expression::CallExpression(call) = self.unwrap_parens(expr) else {
+            return None;
+        };
+        if call.arguments.len() != 2 {
+            return None;
+        }
+        let Some(target_expr) = call.arguments[0].as_expression() else {
+            return None;
+        };
+        let Some(props_expr) = call.arguments[1].as_expression() else {
+            return None;
+        };
+
+        let is_static = if self.is_proto_of_class_alias(class_names, target_expr).is_some() {
+            false
+        } else if self.is_class_alias_ident(class_names, target_expr).is_some() {
+            true
+        } else {
+            return None;
+        };
+
+        let arr = match self.unwrap_parens(props_expr) {
+            Expression::ArrayExpression(a) => ArenaBox::new_in((**a).clone_in(self.allocator), self.allocator),
+            Expression::Identifier(id) => array_assigns.get(id.name.as_str())?.clone_in(self.allocator),
+            _ => return None,
+        };
+
+        Some((call.span, is_static, arr))
     }
 
     fn call_expr_args_are_all_param_idents(&self, call: &CallExpression<'a>, func: &Function<'a>) -> bool {
@@ -445,6 +572,9 @@ impl<'a> Visitor<'a> {
             let mut j = i + 1;
             let mut consumed_any = false;
 
+            // Track recent `id = [ ... ];` so we can resolve defineProperties helper calls that use temp arrays.
+            let mut array_assigns: HashMap<String, ArenaBox<'a, ArrayExpression<'a>>> = HashMap::new();
+
             // Collect simple aliases like `var t = e;` or `t = e;`
             while j < original.len() {
                 match &original[j] {
@@ -498,6 +628,15 @@ impl<'a> Visitor<'a> {
                     if let Expression::AssignmentExpression(ae) = self.unwrap_parens(&es.expression) {
                         if ae.operator == AssignmentOperator::Assign {
                             if matches!(self.unwrap_parens(&ae.right), Expression::ArrayExpression(_)) {
+                                // Record for later call-site consumption.
+                                if let AssignmentTarget::AssignmentTargetIdentifier(id) = &ae.left {
+                                    if let Expression::ArrayExpression(arr) = self.unwrap_parens(&ae.right) {
+                                        array_assigns.insert(
+                                            id.name.as_str().to_string(),
+                                            ArenaBox::new_in((**arr).clone_in(self.allocator), self.allocator),
+                                        );
+                                    }
+                                }
                                 j += 1;
                                 continue;
                             }
@@ -508,6 +647,32 @@ impl<'a> Visitor<'a> {
                 let Statement::ExpressionStatement(es) = &original[j] else {
                     break;
                 };
+
+                // Match Babel/webpack defineProperties helper calls:
+                // helper(Alias.prototype, propsArr) or helper(Alias, propsArr)
+                if let Some((span, is_static, arr)) =
+                    self.match_define_properties_helper_call(&class_names, &array_assigns, &es.expression)
+                {
+                    for el in &arr.elements {
+                        let Some(el_expr) = el.as_expression() else {
+                            // be conservative
+                            break;
+                        };
+                        let Expression::ObjectExpression(obj) = self.unwrap_parens(el_expr) else {
+                            break;
+                        };
+                        let Some((k, f)) = self.descriptor_key_value(obj) else {
+                            break;
+                        };
+                        let Some(ce) = self.method_from_descriptor(span, k, f, is_static, super_class.as_ref()) else {
+                            break;
+                        };
+                        elements.push(ce);
+                        consumed_any = true;
+                    }
+                    j += 1;
+                    continue;
+                }
 
                 // Allow `module.exports = C;` to appear before prototype assignments.
                 if self.match_module_exports_assign(&class_names, &original[j]) {

@@ -1,5 +1,5 @@
 diff --git "a/tests\\app.js" "b/tests\\app_deobf_pretty.js"
-index 411a842..79ef517 100644
+index 411a842..b3da3f9 100644
 --- "a/tests\\app.js"
 +++ "b/tests\\app_deobf_pretty.js"
 @@ -1,97 +1,29 @@
@@ -4810,28 +4810,32 @@ index 411a842..79ef517 100644
                    this.addParticles = s(k);
                    var j = U.currentId - 1;
                    (k.on("tick", function (e) {
-@@ -9340,8 +9229,8 @@
+@@ -9340,9 +9229,9 @@
                          var e = fe.slice();
                          fe.length = 0;
                          for (var t = 0; t < e.length; t++) {
 -                          var i,
 -                            n = e[t];
+-                          (i = n).func.apply(i, isLocalPlayer(n.args));
 +                          var i;
 +                          var n = e[t];
-                           (i = n).func.apply(i, isLocalPlayer(n.args));
++                          (i = n).func.apply(i, n.args);
                          }
                          he = k.time;
-@@ -9350,8 +9239,8 @@
+                       }
+@@ -9350,9 +9239,9 @@
                          var e = ge.slice();
                          ge.length = 0;
                          for (var t = 0; t < e.length; t++) {
 -                          var r,
 -                            n = e[t];
+-                          (r = n).func.apply(r, isLocalPlayer(n.args));
 +                          var r;
 +                          var n = e[t];
-                           (r = n).func.apply(r, isLocalPlayer(n.args));
++                          (r = n).func.apply(r, n.args);
                          }
                          me = k.time;
+                       }
 @@ -9387,7 +9276,6 @@
                        // returns light value at position of removed block
                        // lowest block exposed to sunlight at pos

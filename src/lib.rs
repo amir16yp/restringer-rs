@@ -78,6 +78,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue),
                 Box::new(transforms::safe::unwrap_iife_returning_identifier::UnwrapIifeReturningIdentifier),
                 Box::new(transforms::safe::simplify_babel_class_helpers::SimplifyBabelClassHelpers),
+                Box::new(transforms::safe::simplify_babel_spread_helper::SimplifyBabelSpreadHelper),
                 Box::new(transforms::safe::simplify_babel_es5_class_to_class::SimplifyBabelEs5ClassToClass),
                 Box::new(
                     transforms::safe::replace_identifier_with_fixed_value_not_assigned_at_declaration::ReplaceIdentifierWithFixedValueNotAssignedAtDeclaration,

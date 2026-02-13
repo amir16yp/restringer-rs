@@ -18,6 +18,7 @@ pub mod detect_webpack_bundle;
 pub mod normalize_webpack_require_var_to_const;
 pub mod simplify_babel_class_helpers;
 pub mod simplify_babel_es5_class_to_class;
+pub mod simplify_babel_spread_helper;
 pub mod replace_call_expressions_with_unwrapped_identifier;
 pub mod replace_eval_calls_with_literal_content;
 pub mod replace_new_func_calls_with_literal_content;

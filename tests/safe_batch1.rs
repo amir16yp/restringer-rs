@@ -269,6 +269,38 @@ fn unwrap_iifes_unwraps_initializer_return_iife() {
 }
 
 #[test]
+fn simplify_es5_class_define_properties_helper_to_class() {
+    let input = r#"
+var C = (function () {
+  function C() {
+    return (
+      (function (e, t) {
+        if (!(e instanceof t)) throw new TypeError('Cannot call a class as a function');
+      })(this, C),
+      C.instance || (C.instance = this),
+      C.instance
+    );
+  }
+  var t, r, c;
+  return (
+    (t = C),
+    (c = [{ key: 'getInstance', value: function () { return (void 0 === C.instance && (C.instance = new C()), C.instance); } }]),
+    (r = [{ key: 'initialize', value: function (e) { this.network = e.network; } }]),
+    s(t.prototype, r),
+    s(t, c),
+    C
+  );
+})();
+"#;
+
+    let output = run(input);
+    assert!(output.contains("class C"));
+    assert!(output.contains("constructor("));
+    assert!(output.contains("initialize("));
+    assert!(output.contains("static getInstance("));
+}
+
+#[test]
 fn unwrap_iifes_unwraps_statement_wrapper_iife() {
     let input = "(() => { a(); b(); })();\n";
     let output = run(input);
@@ -715,6 +747,13 @@ fn simplify_babel_es5_class_to_class_rewrites_prototype_and_static_methods() {
     assert!(output.contains("m()") || output.contains("m() {"));
     assert!(output.contains("static s") || output.contains("static s()"));
     assert!(!output.contains("C.prototype"));
+}
+
+#[test]
+fn simplify_babel_spread_helper_renamed_simplifies_apply_argument() {
+    let input = "function isLocalPlayer(e){return (function(e){if(Array.isArray(e)){for(var t=0,i=new Array(e.length);t<e.length;t++)i[t]=e[t];return i;}})(e)||(function(e){if(Symbol.iterator in Object(e)||'[object Arguments]'===Object.prototype.toString.call(e))return Array.from(e);})(e)||(function(){throw new TypeError('Invalid attempt to spread non-iterable instance');})();}\n(function(){var o={m:function(){}};var args=[1,2,3];o.m.apply(o,isLocalPlayer(args));})();\n";
+    let output = run(input);
+    assert!(output.contains("apply(o, args)") || output.contains("apply(o,args)"));
 }
 
 #[test]
