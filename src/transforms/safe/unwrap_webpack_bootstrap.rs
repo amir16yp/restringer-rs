@@ -319,12 +319,6 @@ impl<'a> Visitor<'a> {
                 let Expression::StaticMemberExpression(mem) = expr else {
                     return;
                 };
-                let Expression::Identifier(obj) = &mem.object else {
-                    return;
-                };
-                if obj.name.as_str() != "__webpack_require__" {
-                    return;
-                }
                 self.used.insert(mem.property.name.as_str().to_string());
             }
         }
@@ -337,11 +331,10 @@ impl<'a> Visitor<'a> {
 
             fn visit_call_expression(&mut self, it: &mut CallExpression<'a>) {
                 if let Expression::StaticMemberExpression(mem) = &it.callee {
-                    if let Expression::Identifier(obj) = &mem.object {
-                        if obj.name.as_str() == "__webpack_require__" {
-                            self.used.insert(mem.property.name.as_str().to_string());
-                        }
-                    }
+                    // Record calls like `i.r(exports)` as well as `__webpack_require__.r(exports)`.
+                    // This prevents us from pruning helper assignments before other transforms
+                    // normalize the identifier to `__webpack_require__`.
+                    self.used.insert(mem.property.name.as_str().to_string());
                 }
                 oxc_ast_visit::walk_mut::walk_call_expression(self, it);
             }

@@ -220,6 +220,23 @@ impl<'a> Visitor<'a> {
                     }
                 }
             }
+
+            fn function_shadows_name(&self, func: &Function<'a>) -> bool {
+                if let Some(id) = func.id.as_ref() {
+                    if id.name.as_str() == self.from {
+                        return true;
+                    }
+                }
+                func.params.items.iter().any(|p| matches!(&p.pattern, BindingPattern::BindingIdentifier(id) if id.name.as_str() == self.from))
+            }
+
+            fn arrow_shadows_name(&self, arrow: &ArrowFunctionExpression<'a>) -> bool {
+                arrow
+                    .params
+                    .items
+                    .iter()
+                    .any(|p| matches!(&p.pattern, BindingPattern::BindingIdentifier(id) if id.name.as_str() == self.from))
+            }
         }
 
         impl<'a> VisitMut<'a> for Renamer<'a> {
@@ -244,12 +261,19 @@ impl<'a> Visitor<'a> {
                 oxc_ast_visit::walk_mut::walk_expression(self, it);
             }
 
-            fn visit_function(&mut self, _it: &mut Function<'a>, _flags: ScopeFlags) {
-                // Do not rename inside nested functions.
+            fn visit_function(&mut self, it: &mut Function<'a>, flags: ScopeFlags) {
+                // Descend into nested functions unless they shadow the name.
+                if self.function_shadows_name(it) {
+                    return;
+                }
+                oxc_ast_visit::walk_mut::walk_function(self, it, flags);
             }
 
-            fn visit_arrow_function_expression(&mut self, _it: &mut ArrowFunctionExpression<'a>) {
-                // Do not rename inside nested arrows.
+            fn visit_arrow_function_expression(&mut self, it: &mut ArrowFunctionExpression<'a>) {
+                if self.arrow_shadows_name(it) {
+                    return;
+                }
+                oxc_ast_visit::walk_mut::walk_arrow_function_expression(self, it);
             }
         }
 
