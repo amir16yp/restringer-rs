@@ -1,7 +1,9 @@
 use oxc_allocator::CloneIn;
+use oxc_allocator::Vec as ArenaVec;
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_syntax::scope::ScopeFlags;
+use std::collections::HashSet;
 
 use crate::{Transform, TransformCtx};
 
@@ -43,12 +45,7 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn is_require_entry_return(&self, ret: &ReturnStatement<'a>) -> Option<&'a str> {
-        let arg = ret.argument.as_ref()?;
-        let Expression::CallExpression(call) = self.unwrap_parens(arg) else {
-            return None;
-        };
-
+    fn is_require_entry_call(&self, call: &CallExpression<'a>) -> Option<&'a str> {
         let Expression::Identifier(callee_id) = self.unwrap_parens(&call.callee) else {
             return None;
         };
@@ -142,6 +139,23 @@ impl<'a> Visitor<'a> {
                     }
                 }
             }
+
+            fn function_shadows_name(&self, func: &Function<'a>) -> bool {
+                if let Some(id) = func.id.as_ref() {
+                    if id.name.as_str() == self.from {
+                        return true;
+                    }
+                }
+                func.params.items.iter().any(|p| matches!(&p.pattern, BindingPattern::BindingIdentifier(id) if id.name.as_str() == self.from))
+            }
+
+            fn arrow_shadows_name(&self, arrow: &ArrowFunctionExpression<'a>) -> bool {
+                arrow
+                    .params
+                    .items
+                    .iter()
+                    .any(|p| matches!(&p.pattern, BindingPattern::BindingIdentifier(id) if id.name.as_str() == self.from))
+            }
         }
 
         impl<'a> VisitMut<'a> for Renamer<'a> {
@@ -166,17 +180,57 @@ impl<'a> Visitor<'a> {
                 oxc_ast_visit::walk_mut::walk_expression(self, it);
             }
 
-            fn visit_function(&mut self, _it: &mut Function<'a>, _flags: ScopeFlags) {
-                // do not rename inside nested functions
+            fn visit_function(&mut self, it: &mut Function<'a>, flags: ScopeFlags) {
+                if self.function_shadows_name(it) {
+                    return;
+                }
+                oxc_ast_visit::walk_mut::walk_function(self, it, flags);
             }
 
-            fn visit_arrow_function_expression(&mut self, _it: &mut ArrowFunctionExpression<'a>) {
-                // do not rename inside nested arrows
+            fn visit_arrow_function_expression(&mut self, it: &mut ArrowFunctionExpression<'a>) {
+                if self.arrow_shadows_name(it) {
+                    return;
+                }
+                oxc_ast_visit::walk_mut::walk_arrow_function_expression(self, it);
             }
         }
 
         let mut r = Renamer { allocator: self.allocator, from, to: to_alloc };
         r.visit_function_body(body);
+    }
+
+    fn rename_require_binding_in_function_scope(&mut self, func: &mut Function<'a>, from: &'a str, to: &'a str) {
+        let Some(body) = func.body.as_mut() else {
+            return;
+        };
+
+        // 1) function r(...) { ... }
+        for stmt in body.statements.iter_mut() {
+            let Statement::FunctionDeclaration(fd) = stmt else { continue };
+            let f = &mut **fd;
+            let Some(id) = f.id.as_mut() else { continue };
+            if id.name.as_str() == from {
+                let to_alloc = self.allocator.alloc_str(to);
+                id.name = to_alloc.into();
+                self.modified = true;
+                return;
+            }
+        }
+
+        // 2) var r = function(...) { ... }  / const r = (...) => ...
+        for stmt in body.statements.iter_mut() {
+            let Statement::VariableDeclaration(vd) = stmt else { continue };
+            for decl in vd.declarations.iter_mut() {
+                let BindingPattern::BindingIdentifier(id) = &mut decl.id else { continue };
+                if id.name.as_str() != from {
+                    continue;
+                }
+                let to_alloc = self.allocator.alloc_str(to);
+                id.name = to_alloc.into();
+                self.modified = true;
+                return;
+            }
+        }
     }
 
     fn try_normalize_require_name(&mut self, func: &mut Function<'a>) {
@@ -186,10 +240,24 @@ impl<'a> Visitor<'a> {
 
         let mut require_name: Option<&str> = None;
         for stmt in &body.statements {
-            let Statement::ReturnStatement(ret) = stmt else {
-                continue;
-            };
-            require_name = self.is_require_entry_return(ret);
+            match stmt {
+                Statement::ReturnStatement(ret) => {
+                    let Some(arg) = ret.argument.as_ref() else {
+                        continue;
+                    };
+                    let Expression::CallExpression(call) = self.unwrap_parens(arg) else {
+                        continue;
+                    };
+                    require_name = self.is_require_entry_call(call);
+                }
+                Statement::ExpressionStatement(es) => {
+                    let Expression::CallExpression(call) = self.unwrap_parens(&es.expression) else {
+                        continue;
+                    };
+                    require_name = self.is_require_entry_call(call);
+                }
+                _ => {}
+            }
             if require_name.is_some() {
                 break;
             }
@@ -207,6 +275,8 @@ impl<'a> Visitor<'a> {
             return;
         }
 
+        // Rename the binding itself first (so __webpack_require__ is defined), then update references.
+        self.rename_require_binding_in_function_scope(func, require_name, "__webpack_require__");
         self.rename_identifier_in_function_body(func, require_name, "__webpack_require__");
         self.modified = true;
     }
@@ -229,22 +299,123 @@ impl<'a> Visitor<'a> {
 
         true
     }
+
+    fn unwrap_top_level_plain_iife(&mut self, expr: &mut Expression<'a>) -> bool {
+        // If the program already has a plain IIFE expression statement, keep it as-is,
+        // but return true to indicate we should attempt to normalize webpack require name.
+        let Expression::CallExpression(_call) = self.unwrap_parens_mut(expr) else {
+            return false;
+        };
+        true
+    }
+
+    fn collect_used_require_props(&self, program: &Program<'a>) -> HashSet<String> {
+        struct Collector {
+            used: HashSet<String>,
+        }
+
+        impl<'a> Collector {
+            fn record_member(&mut self, expr: &Expression<'a>) {
+                let Expression::StaticMemberExpression(mem) = expr else {
+                    return;
+                };
+                let Expression::Identifier(obj) = &mem.object else {
+                    return;
+                };
+                if obj.name.as_str() != "__webpack_require__" {
+                    return;
+                }
+                self.used.insert(mem.property.name.as_str().to_string());
+            }
+        }
+
+        impl<'a> VisitMut<'a> for Collector {
+            fn visit_expression(&mut self, it: &mut Expression<'a>) {
+                self.record_member(it);
+                oxc_ast_visit::walk_mut::walk_expression(self, it);
+            }
+
+            fn visit_call_expression(&mut self, it: &mut CallExpression<'a>) {
+                if let Expression::StaticMemberExpression(mem) = &it.callee {
+                    if let Expression::Identifier(obj) = &mem.object {
+                        if obj.name.as_str() == "__webpack_require__" {
+                            self.used.insert(mem.property.name.as_str().to_string());
+                        }
+                    }
+                }
+                oxc_ast_visit::walk_mut::walk_call_expression(self, it);
+            }
+
+            fn visit_assignment_expression(&mut self, it: &mut AssignmentExpression<'a>) {
+                // Do not treat writes (`__webpack_require__.x = ...`) as usage.
+                oxc_ast_visit::walk_mut::walk_expression(self, &mut it.right);
+            }
+        }
+
+        let mut program_clone = program.clone_in(self.allocator);
+        let mut c = Collector { used: HashSet::new() };
+        c.visit_program(&mut program_clone);
+        c.used
+    }
+
+    fn prune_unused_require_helper_assignments(&mut self, func: &mut Function<'a>, used_props: &HashSet<String>) {
+        let Some(body) = func.body.as_mut() else {
+            return;
+        };
+
+        let original = std::mem::replace(&mut body.statements, ArenaVec::new_in(self.allocator));
+        let mut out = ArenaVec::new_in(self.allocator);
+
+        for stmt in original {
+            let mut keep = true;
+            if let Statement::ExpressionStatement(es) = &stmt {
+                if let Expression::AssignmentExpression(assign) = self.unwrap_parens(&es.expression) {
+                    if assign.operator == AssignmentOperator::Assign {
+                        if let AssignmentTarget::StaticMemberExpression(mem) = &assign.left {
+                            if let Expression::Identifier(obj) = self.unwrap_parens(&mem.object) {
+                                if obj.name.as_str() == "__webpack_require__" {
+                                    let prop = mem.property.name.as_str();
+                                    if !used_props.contains(prop) {
+                                        keep = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if keep {
+                out.push(stmt);
+            } else {
+                self.modified = true;
+            }
+        }
+
+        body.statements = out;
+    }
 }
 
 impl<'a> VisitMut<'a> for Visitor<'a> {
     fn visit_program(&mut self, it: &mut Program<'a>) {
+        let used_props = self.collect_used_require_props(it);
+
         for stmt in &mut it.body {
             let Statement::ExpressionStatement(es) = stmt else {
                 continue;
             };
 
-            if self.unwrap_top_level_bang_iife(&mut es.expression) {
+            let should_try_normalize = self.unwrap_top_level_bang_iife(&mut es.expression)
+                || self.unwrap_top_level_plain_iife(&mut es.expression);
+
+            if should_try_normalize {
                 // If callee is a function expression, try to normalize require name.
                 let expr = self.unwrap_parens_mut(&mut es.expression);
                 if let Expression::CallExpression(call) = expr {
                     let callee = self.unwrap_parens_mut(&mut call.callee);
                     if let Expression::FunctionExpression(func) = callee {
                         self.try_normalize_require_name(func);
+                        self.prune_unused_require_helper_assignments(func, &used_props);
                     }
                 }
             }

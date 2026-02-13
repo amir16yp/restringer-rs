@@ -655,11 +655,33 @@ fn unwrap_webpack_bootstrap_renames_require_fn_to_webpack_require() {
 }
 
 #[test]
+fn unwrap_webpack_bootstrap_renames_require_fn_for_plain_iife_entry_statement() {
+    let input = "(function(e){function r(i){return i;}r((r.s=228));})([]);";
+    let output = run(input);
+    assert!(output.contains("__webpack_require__"));
+    assert!(!output.contains("r((r.s"));
+}
+
+#[test]
+fn unwrap_webpack_bootstrap_renames_nested_helper_references() {
+    let input = "(function(e){function r(i){return i;}r.o=function(a,b){return a[b];};r.d=function(e,t,n){if(!r.o(e,t))e[t]=n;};r((r.s=1));})([]);";
+    let output = run(input);
+    assert!(output.contains("function __webpack_require__"));
+    // Depending on simplification passes, helper assignments like `.d` / `.o` may be pruned
+    // if they are not used outside the bootstrap.
+    assert!(!output.contains("r.d"));
+    assert!(!output.contains("!r.o"));
+    assert!(!output.contains("r.d"));
+}
+
+#[test]
 fn detect_webpack_bundle_normalizes_module_factory_param_names() {
     let input = "var m = {573:function(e,t,i){var x=i(1);t.a=x;}};";
     let output = run(input);
     assert!(output.contains("__webpack_require__(1)"));
     assert!(output.contains("exports.a"));
+    assert!(output.contains("function _wp_mod_573"));
+    assert!(output.contains("var m") && output.contains("573: _wp_mod_573"));
 }
 
 #[test]
