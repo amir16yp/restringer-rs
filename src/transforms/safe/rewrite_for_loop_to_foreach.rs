@@ -129,7 +129,16 @@ impl<'a> Visitor<'a> {
         Some(mem)
     }
 
-    fn match_loop_body(&self, body: &Statement<'a>, arr_name: &str, i_name: &str) -> Option<(String, String)> {
+    fn extract_nested_assignment_value<'b>(&self, expr: &'b Expression<'a>) -> &'b Expression<'a> {
+        if let Expression::AssignmentExpression(assign) = self.unwrap_parens(expr) {
+            if assign.operator == AssignmentOperator::Assign {
+                return self.extract_nested_assignment_value(&assign.right);
+            }
+        }
+        expr
+    }
+
+    fn match_loop_body(&self, body: &Statement<'a>, arr_name: &str, i_name: &str) -> Option<(String, String, String)> {
         let Statement::ExpressionStatement(es) = body else { return None };
         let Expression::LogicalExpression(log) = self.unwrap_parens(&es.expression) else { return None };
         if log.operator != LogicalOperator::Or {
@@ -142,7 +151,27 @@ impl<'a> Visitor<'a> {
             return None;
         }
         let Some(cond_arg0) = cond_call.arguments[0].as_expression() else { return None };
-        let _ = self.arr_index_expr(cond_arg0, arr_name, i_name)?;
+        
+        let cond_arg_unwrapped = self.extract_nested_assignment_value(cond_arg0);
+        
+        let source_obj_name = if let Some(mem) = self.arr_index_expr(cond_arg_unwrapped, arr_name, i_name) {
+            None
+        } else {
+            if let Expression::ComputedMemberExpression(mem) = self.unwrap_parens(cond_arg_unwrapped) {
+                if let Expression::Identifier(obj_id) = self.unwrap_parens(&mem.object) {
+                    let inner_expr = self.extract_nested_assignment_value(&mem.expression);
+                    if self.arr_index_expr(inner_expr, arr_name, i_name).is_some() {
+                        Some(obj_id.name.as_str().to_string())
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        };
 
         let Expression::AssignmentExpression(assign) = self.unwrap_parens(&log.right) else { return None };
         if assign.operator != AssignmentOperator::Assign {
@@ -151,11 +180,35 @@ impl<'a> Visitor<'a> {
 
         let AssignmentTarget::ComputedMemberExpression(lhs_mem) = &assign.left else { return None };
         let Expression::Identifier(target_ident) = self.unwrap_parens(&lhs_mem.object) else { return None };
-        let _ = self.arr_index_expr(&lhs_mem.expression, arr_name, i_name)?;
+        
+        let lhs_index_unwrapped = self.extract_nested_assignment_value(&lhs_mem.expression);
+        
+        let lhs_is_temp_var = if self.arr_index_expr(lhs_index_unwrapped, arr_name, i_name).is_some() {
+            false
+        } else {
+            matches!(self.unwrap_parens(lhs_index_unwrapped), Expression::Identifier(_))
+        };
 
-        let _ = self.arr_index_expr(&assign.right, arr_name, i_name)?;
+        let rhs_unwrapped = self.extract_nested_assignment_value(&assign.right);
+        if source_obj_name.is_some() {
+            if !matches!(self.unwrap_parens(rhs_unwrapped), Expression::Identifier(_)) {
+                return None;
+            }
+        } else {
+            if !lhs_is_temp_var {
+                let _ = self.arr_index_expr(rhs_unwrapped, arr_name, i_name)?;
+            } else {
+                if !matches!(self.unwrap_parens(rhs_unwrapped), Expression::Identifier(_)) {
+                    return None;
+                }
+            }
+        }
 
-        Some((cond_ident.name.as_str().to_string(), target_ident.name.as_str().to_string()))
+        Some((
+            cond_ident.name.as_str().to_string(),
+            target_ident.name.as_str().to_string(),
+            source_obj_name.unwrap_or_else(|| arr_name.to_string()),
+        ))
     }
 
     fn parse_replacement_stmt(
@@ -163,14 +216,19 @@ impl<'a> Visitor<'a> {
         arr_name: &str,
         cond_name: &str,
         target_name: &str,
+        source_name: &str,
     ) -> Option<Statement<'a>> {
         let mut code = String::new();
         code.push_str(arr_name);
-        code.push_str(".forEach(key => { if (!");
+        code.push_str(".forEach(item => { if (!");
         code.push_str(cond_name);
-        code.push_str("(key)) ");
+        code.push('(');
+        code.push_str(source_name);
+        code.push_str("[item])) ");
         code.push_str(target_name);
-        code.push_str("[key] = key; });");
+        code.push_str("[item] = ");
+        code.push_str(source_name);
+        code.push_str("[item]; });");
 
         let temp_allocator = Allocator::default();
         let parse_ret = Parser::new(&temp_allocator, &code, self.source_type)
@@ -191,8 +249,8 @@ impl<'a> Visitor<'a> {
         for stmt in original {
             if let Statement::ForStatement(for_stmt) = &stmt {
                 if let Some((i_name, arr_name)) = self.match_for_header(for_stmt) {
-                    if let Some((cond_name, target_name)) = self.match_loop_body(&for_stmt.body, &arr_name, &i_name) {
-                        if let Some(replacement) = self.parse_replacement_stmt(&arr_name, &cond_name, &target_name) {
+                    if let Some((cond_name, target_name, source_name)) = self.match_loop_body(&for_stmt.body, &arr_name, &i_name) {
+                        if let Some(replacement) = self.parse_replacement_stmt(&arr_name, &cond_name, &target_name, &source_name) {
                             out.push(replacement);
                             self.modified = true;
                             continue;

@@ -250,7 +250,19 @@ mod tests {
         assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
         assert!(after.contains("arr.forEach"), "before:\n{before}\n\nafter:\n{after}\n");
         assert!(after.contains("if (!cond"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("target[key]"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("target[item]"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn rewrite_for_loop_to_foreach_nested_assignment_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::rewrite_for_loop_to_foreach::RewriteForLoopToForEach,
+            "for (n = 0; n < p.length; n++) r(i = t[s = p[n]]) || (e[s] = i);",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("p.forEach"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("if (!r(t[item]))"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("e[item] = t[item]"), "before:\n{before}\n\nafter:\n{after}\n");
     }
 
     #[test]
