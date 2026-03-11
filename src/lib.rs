@@ -7,6 +7,241 @@ use oxc_span::SourceType;
 
 mod transforms;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run_one_transform<T: Transform>(transform: T, source_text: &str) -> (bool, String, String) {
+        let allocator = Allocator::default();
+        let source_type = SourceType::mjs();
+        let parse_ret = Parser::new(&allocator, source_text, source_type)
+            .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
+            .parse();
+        assert!(parse_ret.errors.is_empty(), "parse failed");
+
+        let mut program = parse_ret.program;
+        let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
+
+        let CodegenReturn { code: before, .. } = Codegen::new().build(&program);
+        let modified = transform.run(&mut ctx, &mut program);
+
+        let CodegenReturn { code: after, .. } = Codegen::new().build(&program);
+
+        println!("=== {} ===\n-- before --\n{}\n\n-- after --\n{}\n", transform.name(), before, after);
+        (modified, before, after)
+    }
+
+    #[test]
+    fn normalize_void0_example() {
+        let (modified, before, after) =
+            run_one_transform(transforms::safe::normalize_void0::NormalizeVoid0, "var x = void 0;");
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("undefined"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn simplify_double_negation_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::simplify_double_negation::SimplifyDoubleNegation,
+            "if (!!x) { a(); }",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(
+            after.contains("if (x") || after.contains("if(x"),
+            "before:\n{before}\n\nafter:\n{after}\n"
+        );
+    }
+
+    #[test]
+    fn fold_string_concatenation_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::fold_string_concatenation::FoldStringConcatenation,
+            "var s = 'a' + 'b';",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("ab"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn parse_template_literals_into_string_literals_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
+            "var s = `ab`;",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("ab"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn normalize_computed_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::normalize_computed::NormalizeComputed,
+            "var o = { a: 1 }; o['a'];",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("o.a"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn normalize_empty_statements_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::normalize_empty_statements::NormalizeEmptyStatements,
+            ";;a();;;",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(!after.contains(";;;"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn rearrange_sequences_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::rearrange_sequences::RearrangeSequences,
+            "if (a(), b()) { c(); }",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("a();") || after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("if (b()") || after.contains("if(b()"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn separate_chained_declarators_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::separate_chained_declarators::SeparateChainedDeclarators,
+            "var a=1,b=2;",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("var a"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("var b"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn replace_sequences_with_expressions_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
+            "a(), b();",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("b()"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(!after.contains(","), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn resolve_deterministic_if_statements_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::resolve_deterministic_if_statements::ResolveDeterministicIfStatements,
+            "if (true) { a(); } else { b(); }",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(!after.contains("b()"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn simplify_jsfuck_booleans_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::simplify_jsfuck_booleans::SimplifyJsFuckBooleans,
+            "if (![]) { a(); }",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("false"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn fold_string_from_char_codes_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::fold_string_from_char_codes::FoldStringFromCharCodes,
+            "var s = String.fromCharCode(97, 98);",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("ab"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn resolve_function_constructor_calls_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls,
+            "var f = Function.constructor('a', 'return a+1');",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("function"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("return"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn replace_function_return_this_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::replace_function_return_this::ReplaceFunctionReturnThis,
+            "var x = Function('return this')();",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("globalThis"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn unwrap_iifes_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::unwrap_iifes::UnwrapIIFEs,
+            "(function(){a();})();",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(!after.contains("function"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn unwrap_iife_returning_identifier_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::unwrap_iife_returning_identifier::UnwrapIifeReturningIdentifier,
+            "var x=(function(){return y})();",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("var x") && after.contains("y"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn unwrap_bind_null_literal_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::unwrap_bind_null_literal::UnwrapBindNullLiteral,
+            "var f=function(x){return x}.bind(null,1); f();",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("1"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn normalize_webpack_require_var_to_const_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::normalize_webpack_require_var_to_const::NormalizeWebpackRequireVarToConst,
+            "var a = __webpack_require__(0);",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("const"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn resolve_proxy_variables_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::resolve_proxy_variables::ResolveProxyVariables,
+            "const b = a; b;",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("a"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("a;"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn resolve_member_expression_references_to_array_index_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
+            "const a=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]; a[20];",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("20"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+}
+
 pub struct Restringer {
     normalize: bool,
     max_iterations: usize,
@@ -20,7 +255,7 @@ impl Default for Restringer {
     fn default() -> Self {
         Self {
             normalize: true,
-            max_iterations: 50,
+            max_iterations: 100,
             parse_options: ParseOptions { parse_regular_expression: true, ..ParseOptions::default() },
             codegen_options: CodegenOptions::default(),
             safe_transforms: vec![
