@@ -32,8 +32,6 @@ impl Default for Restringer {
                 Box::new(transforms::safe::resolve_proxy_references::ResolveProxyReferences),
                 Box::new(transforms::safe::resolve_string_array_decoder_calls::ResolveStringArrayDecoderCalls),
                 Box::new(transforms::safe::resolve_dispatch_table_calls::ResolveDispatchTableCalls),
-                Box::new(transforms::safe::unwrap_webpack_bootstrap::UnwrapWebpackBootstrap),
-                Box::new(transforms::safe::detect_webpack_bundle::DetectWebpackBundle),
                 Box::new(transforms::safe::normalize_webpack_require_var_to_const::NormalizeWebpackRequireVarToConst),
                 Box::new(transforms::safe::replace_function_return_this::ReplaceFunctionReturnThis),
                 Box::new(
