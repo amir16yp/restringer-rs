@@ -240,6 +240,39 @@ mod tests {
         assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
         assert!(after.contains("20"), "before:\n{before}\n\nafter:\n{after}\n");
     }
+
+    #[test]
+    fn rewrite_for_loop_to_foreach_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::rewrite_for_loop_to_foreach::RewriteForLoopToForEach,
+            "for (i = 0; i < arr.length; i++) cond(arr[i]) || (target[arr[i]] = arr[i]);",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("arr.forEach"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("if (!cond"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("target[key]"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn simplify_indirect_property_lookup_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::simplify_indirect_property_lookup::SimplifyIndirectPropertyLookup,
+            "m(B, e) ? B[e](arg) : fallback;",
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains("B[e](arg)"), "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(!after.contains("m(B, e)"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
+
+    #[test]
+    fn simplify_chained_replace_calls_example() {
+        let (modified, before, after) = run_one_transform(
+            transforms::safe::simplify_chained_replace_calls::SimplifyChainedReplaceCalls,
+            r#"e.replace("\\", "").replace(/\\(\[)|\\(\])|\[([^\]\[]*)\]|\\(.)/g, function(e, t, n, s, i) { return t || n || s || i; });"#,
+        );
+        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
+        assert!(after.contains(r"replace(/\\?\[|\]|\\(.)/g"), "before:\n{before}\n\nafter:\n{after}\n");
+    }
 }
 
 pub struct Restringer {
@@ -269,6 +302,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe::resolve_dispatch_table_calls::ResolveDispatchTableCalls),
                 Box::new(transforms::safe::normalize_webpack_require_var_to_const::NormalizeWebpackRequireVarToConst),
                 Box::new(transforms::safe::replace_function_return_this::ReplaceFunctionReturnThis),
+                Box::new(transforms::safe::rewrite_for_loop_to_foreach::RewriteForLoopToForEach),
                 Box::new(
                     transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
                 ),
@@ -299,6 +333,8 @@ impl Default for Restringer {
                 Box::new(transforms::safe::simplify_module_factory_call::SimplifyModuleFactoryCall),
                 Box::new(transforms::safe::unwrap_bind_null_literal::UnwrapBindNullLiteral),
                 Box::new(transforms::safe::simplify_calls::SimplifyCalls),
+                Box::new(transforms::safe::simplify_indirect_property_lookup::SimplifyIndirectPropertyLookup),
+                Box::new(transforms::safe::simplify_chained_replace_calls::SimplifyChainedReplaceCalls),
                 Box::new(
                     transforms::safe::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
                 ),

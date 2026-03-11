@@ -292,9 +292,7 @@
 		};
 	}
 	function fe(e, t) {
-		return m(B, e) ? B[e](t._strict, t._locale) : new RegExp(me(e.replace("\\", "").replace(/\\(\[)|\\(\])|\[([^\]\[]*)\]|\\(.)/g, function(e, t, n, s, i) {
-			return t || n || s || i;
-		})));
+		return B[e](t._strict, t._locale);
 	}
 	function me(e) {
 		return e.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");

@@ -32,6 +32,7 @@ pub mod resolve_member_expressions_with_direct_assignment;
 pub mod resolve_redundant_logical_expressions;
 pub mod resolve_dispatch_table_calls;
 pub mod resolve_string_array_decoder_calls;
+pub mod rewrite_for_loop_to_foreach;
 pub mod separate_chained_declarators;
 pub mod simplify_if_statements;
 pub mod replace_boolean_expressions_with_if;
@@ -44,3 +45,5 @@ pub mod unwrap_function_shells;
 pub mod replace_identifier_with_fixed_assigned_value;
 
 pub mod replace_identifier_with_fixed_value_not_assigned_at_declaration;
+pub mod simplify_indirect_property_lookup;
+pub mod simplify_chained_replace_calls;
