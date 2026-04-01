@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
- clap = { version = "4.5.28", features = ["derive"] }
+ clap = { version = "4.6.0", features = ["derive"] }
+ rquickjs = { version = "0.8", features = ["array-buffer", "classes"] }
  oxc_allocator = "0.123.0"
  oxc_ast = "0.123.0"
  oxc_ast_visit = "0.123.0"
@@ -13,3 +14,6 @@ edition = "2024"
  oxc_semantic = "0.123.0"
  oxc_span = "0.123.0"
  oxc_syntax = "0.123.0"
+
+
+[dev-dependencies]

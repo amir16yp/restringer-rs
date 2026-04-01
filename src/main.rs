@@ -25,7 +25,7 @@ struct Cli {
     /// The obfuscated JS/TS file
     input_filename: PathBuf,
 
-    /// Remove dead nodes from script after deobfuscation is complete (unsafeTransforms)
+    /// Remove dead nodes from script after deobfuscation is complete (unsafe_transforms)
     #[arg(short = 'c', long = "clean")]
     clean: bool,
 

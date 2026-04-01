@@ -108,7 +108,7 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        // 2) Scan statement list for writes/unsafeTransforms contexts.
+        // 2) Scan statement list for writes/unsafe_transforms contexts.
         for stmt in stmts {
             self.collect_used_in_conditional_from_statement(stmt, &mut used_in_conditional);
 
@@ -652,7 +652,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn load_map_for_statement_list(&mut self, stmts: &[Statement<'a>]) {
-        // Case 1: `const a = 3; ...` — only safeTransforms if the name is never modified (assigned/updated/etc).
+        // Case 1: `const a = 3; ...` — only safe_transforms if the name is never modified (assigned/updated/etc).
         let mut candidates_assigned_at_decl = self.collect_candidates_from_statement_list(stmts);
         let modified = self.collect_modified_names_in_statement_list(stmts);
         candidates_assigned_at_decl.retain(|k, _| !modified.contains(k));

@@ -110,7 +110,7 @@ impl<'a> Visitor<'a> {
         let Expression::CallExpression(call) = it else { return false; };
         let Some(rep) = self.maybe_eval_replacement(call) else { return false; };
 
-        // Only safeTransforms to replace an expression with another expression.
+        // Only safe_transforms to replace an expression with another expression.
         let Replacement::Expr(expr) = rep else { return false; };
         *it = expr;
         true
