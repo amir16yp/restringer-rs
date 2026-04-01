@@ -26,57 +26,60 @@ impl Default for Restringer {
             parse_options: ParseOptions { parse_regular_expression: true, ..ParseOptions::default() },
             codegen_options: CodegenOptions::default(),
             safe_transforms: vec![
-                Box::new(transforms::safe::rearrange_sequences::RearrangeSequences),
-                Box::new(transforms::safe::separate_chained_declarators::SeparateChainedDeclarators),
-                Box::new(transforms::safe::rearrange_switches::RearrangeSwitches),
-                Box::new(transforms::safe::resolve_proxy_variables::ResolveProxyVariables),
-                Box::new(transforms::safe::resolve_proxy_calls::ResolveProxyCalls),
-                Box::new(transforms::safe::resolve_proxy_references::ResolveProxyReferences),
+                Box::new(transforms::safeTransforms::resolve_jsfuck_primitives::ResolveJSFuckPrimitives),
+                Box::new(transforms::safeTransforms::unwrap_parentheses::UnwrapParentheses),
+                Box::new(transforms::safeTransforms::simplify_array_coercion::SimplifyArrayCoercion),
+                Box::new(transforms::safeTransforms::rearrange_sequences::RearrangeSequences),
+                Box::new(transforms::safeTransforms::separate_chained_declarators::SeparateChainedDeclarators),
+                Box::new(transforms::safeTransforms::rearrange_switches::RearrangeSwitches),
+                Box::new(transforms::safeTransforms::resolve_proxy_variables::ResolveProxyVariables),
+                Box::new(transforms::safeTransforms::resolve_proxy_calls::ResolveProxyCalls),
+                Box::new(transforms::safeTransforms::resolve_proxy_references::ResolveProxyReferences),
                 Box::new(
-                    transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
+                    transforms::safeTransforms::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
                 ),
                 Box::new(
-                    transforms::safe::resolve_member_expressions_with_direct_assignment::ResolveMemberExpressionsWithDirectAssignment,
+                    transforms::safeTransforms::resolve_member_expressions_with_direct_assignment::ResolveMemberExpressionsWithDirectAssignment,
                 ),
-                Box::new(transforms::safe::normalize_computed::NormalizeComputed),
-                Box::new(transforms::safe::normalize_empty_statements::NormalizeEmptyStatements),
-                Box::new(transforms::safe::remove_redundant_block_statements::RemoveRedundantBlockStatements),
-                Box::new(transforms::safe::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
-                Box::new(transforms::safe::unwrap_simple_operations::UnwrapSimpleOperations),
+                Box::new(transforms::safeTransforms::normalize_computed::NormalizeComputed),
+                Box::new(transforms::safeTransforms::normalize_empty_statements::NormalizeEmptyStatements),
+                Box::new(transforms::safeTransforms::remove_redundant_block_statements::RemoveRedundantBlockStatements),
+                Box::new(transforms::safeTransforms::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
+                Box::new(transforms::safeTransforms::unwrap_simple_operations::UnwrapSimpleOperations),
                 Box::new(
-                    transforms::safe::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
+                    transforms::safeTransforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
                 ),
-                Box::new(transforms::safe::resolve_deterministic_if_statements::ResolveDeterministicIfStatements),
+                Box::new(transforms::safeTransforms::resolve_deterministic_if_statements::ResolveDeterministicIfStatements),
                 Box::new(
-                    transforms::safe::replace_boolean_expressions_with_if::ReplaceBooleanExpressionsWithIf,
-                ),
-                Box::new(
-                    transforms::safe::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
-                ),
-                Box::new(transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
-                Box::new(transforms::safe::simplify_calls::SimplifyCalls),
-                Box::new(
-                    transforms::safe::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
+                    transforms::safeTransforms::replace_boolean_expressions_with_if::ReplaceBooleanExpressionsWithIf,
                 ),
                 Box::new(
-                    transforms::safe::replace_eval_calls_with_literal_content::ReplaceEvalCallsWithLiteralContent,
+                    transforms::safeTransforms::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
+                ),
+                Box::new(transforms::safeTransforms::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
+                Box::new(transforms::safeTransforms::simplify_calls::SimplifyCalls),
+                Box::new(
+                    transforms::safeTransforms::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
                 ),
                 Box::new(
-                    transforms::safe::replace_new_func_calls_with_literal_content::ReplaceNewFuncCallsWithLiteralContent,
-                ),
-                Box::new(transforms::safe::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue),
-                Box::new(
-                    transforms::safe::replace_identifier_with_fixed_value_not_assigned_at_declaration::ReplaceIdentifierWithFixedValueNotAssignedAtDeclaration,
+                    transforms::safeTransforms::replace_eval_calls_with_literal_content::ReplaceEvalCallsWithLiteralContent,
                 ),
                 Box::new(
-                    transforms::safe::replace_function_shells_with_wrapped_value::ReplaceFunctionShellsWithWrappedValue,
+                    transforms::safeTransforms::replace_new_func_calls_with_literal_content::ReplaceNewFuncCallsWithLiteralContent,
+                ),
+                Box::new(transforms::safeTransforms::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue),
+                Box::new(
+                    transforms::safeTransforms::replace_identifier_with_fixed_value_not_assigned_at_declaration::ReplaceIdentifierWithFixedValueNotAssignedAtDeclaration,
                 ),
                 Box::new(
-                    transforms::safe::replace_function_shells_with_wrapped_value_iife::ReplaceFunctionShellsWithWrappedValueIIFE,
+                    transforms::safeTransforms::replace_function_shells_with_wrapped_value::ReplaceFunctionShellsWithWrappedValue,
                 ),
-                Box::new(transforms::safe::unwrap_function_shells::UnwrapFunctionShells),
-                Box::new(transforms::safe::unwrap_iifes::UnwrapIIFEs),
-                Box::new(transforms::safe::simplify_if_statements::SimplifyIfStatements),
+                Box::new(
+                    transforms::safeTransforms::replace_function_shells_with_wrapped_value_iife::ReplaceFunctionShellsWithWrappedValueIIFE,
+                ),
+                Box::new(transforms::safeTransforms::unwrap_function_shells::UnwrapFunctionShells),
+                Box::new(transforms::safeTransforms::unwrap_iifes::UnwrapIIFEs),
+                Box::new(transforms::safeTransforms::simplify_if_statements::SimplifyIfStatements),
             ],
             unsafe_transforms: Vec::new(),
         }
@@ -273,7 +276,7 @@ impl Restringer {
             check_timeout()?;
             modified_this_round = false;
 
-            // Phase 1: apply safe transforms iteratively up to max_iterations.
+            // Phase 1: apply safeTransforms transforms iteratively up to max_iterations.
             if !self.safe_transforms.is_empty() {
                 for _ in 0..max_iterations {
                     check_timeout()?;
@@ -294,7 +297,7 @@ impl Restringer {
                 }
             }
 
-            // Phase 2: apply unsafe transforms exactly once.
+            // Phase 2: apply unsafeTransforms transforms exactly once.
             if opts.run_unsafe && !self.unsafe_transforms.is_empty() {
                 check_timeout()?;
                 let mut modified_iter = false;

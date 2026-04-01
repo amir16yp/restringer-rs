@@ -54,7 +54,7 @@ impl<'a> Visitor<'a> {
 
         match self.unwrap_parens(&call.callee) {
             Expression::ArrowFunctionExpression(arrow) => {
-                // oxc represents arrow bodies without a dedicated enum; handle the common safe case:
+                // oxc represents arrow bodies without a dedicated enum; handle the common safeTransforms case:
                 // body contains a single return statement.
                 let body = &arrow.body;
                 if body.statements.len() != 1 {
