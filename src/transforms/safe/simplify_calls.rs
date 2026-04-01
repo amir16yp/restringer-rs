@@ -1,3 +1,5 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use oxc_allocator::{Box as ArenaBox, CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
@@ -126,6 +128,7 @@ impl<'a> Visitor<'a> {
     fn make_call_expr(&self, span: oxc_span::Span, callee: Expression<'a>, arguments: ArenaVec<'a, Argument<'a>>) -> Expression<'a> {
         Expression::CallExpression(ArenaBox::new_in(
             CallExpression {
+                node_id: Cell::new(NodeId::DUMMY),
                 span,
                 callee,
                 type_arguments: None,

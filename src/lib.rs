@@ -8,285 +8,7 @@ use oxc_span::SourceType;
 mod transforms;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn run_one_transform<T: Transform>(transform: T, source_text: &str) -> (bool, String, String) {
-        let allocator = Allocator::default();
-        let source_type = SourceType::mjs();
-        let parse_ret = Parser::new(&allocator, source_text, source_type)
-            .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
-            .parse();
-        assert!(parse_ret.errors.is_empty(), "parse failed");
-
-        let mut program = parse_ret.program;
-        let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
-
-        let CodegenReturn { code: before, .. } = Codegen::new().build(&program);
-        let modified = transform.run(&mut ctx, &mut program);
-
-        let CodegenReturn { code: after, .. } = Codegen::new().build(&program);
-
-        println!("=== {} ===\n-- before --\n{}\n\n-- after --\n{}\n", transform.name(), before, after);
-        (modified, before, after)
-    }
-
-    #[test]
-    fn normalize_void0_example() {
-        let (modified, before, after) =
-            run_one_transform(transforms::safe::normalize_void0::NormalizeVoid0, "var x = void 0;");
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("undefined"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn simplify_double_negation_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::simplify_double_negation::SimplifyDoubleNegation,
-            "if (!!x) { a(); }",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(
-            after.contains("if (x") || after.contains("if(x"),
-            "before:\n{before}\n\nafter:\n{after}\n"
-        );
-    }
-
-    #[test]
-    fn fold_string_concatenation_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::fold_string_concatenation::FoldStringConcatenation,
-            "var s = 'a' + 'b';",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("ab"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn parse_template_literals_into_string_literals_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
-            "var s = `ab`;",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("ab"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn normalize_computed_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::normalize_computed::NormalizeComputed,
-            "var o = { a: 1 }; o['a'];",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("o.a"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn normalize_empty_statements_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::normalize_empty_statements::NormalizeEmptyStatements,
-            ";;a();;;",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(!after.contains(";;;"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn rearrange_sequences_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::rearrange_sequences::RearrangeSequences,
-            "if (a(), b()) { c(); }",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("a();") || after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("if (b()") || after.contains("if(b()"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn separate_chained_declarators_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::separate_chained_declarators::SeparateChainedDeclarators,
-            "var a=1,b=2;",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("var a"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("var b"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn replace_sequences_with_expressions_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
-            "a(), b();",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("b()"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(!after.contains(","), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn resolve_deterministic_if_statements_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::resolve_deterministic_if_statements::ResolveDeterministicIfStatements,
-            "if (true) { a(); } else { b(); }",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(!after.contains("b()"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn simplify_jsfuck_booleans_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::simplify_jsfuck_booleans::SimplifyJsFuckBooleans,
-            "if (![]) { a(); }",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("false"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn fold_string_from_char_codes_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::fold_string_from_char_codes::FoldStringFromCharCodes,
-            "var s = String.fromCharCode(97, 98);",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("ab"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn resolve_function_constructor_calls_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls,
-            "var f = Function.constructor('a', 'return a+1');",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("function"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("return"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn replace_function_return_this_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::replace_function_return_this::ReplaceFunctionReturnThis,
-            "var x = Function('return this')();",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("globalThis"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn unwrap_iifes_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::unwrap_iifes::UnwrapIIFEs,
-            "(function(){a();})();",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("a()"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(!after.contains("function"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn unwrap_iife_returning_identifier_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::unwrap_iife_returning_identifier::UnwrapIifeReturningIdentifier,
-            "var x=(function(){return y})();",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("var x") && after.contains("y"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn unwrap_bind_null_literal_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::unwrap_bind_null_literal::UnwrapBindNullLiteral,
-            "var f=function(x){return x}.bind(null,1); f();",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("1"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn normalize_webpack_require_var_to_const_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::normalize_webpack_require_var_to_const::NormalizeWebpackRequireVarToConst,
-            "var a = __webpack_require__(0);",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("const"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn resolve_proxy_variables_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::resolve_proxy_variables::ResolveProxyVariables,
-            "const b = a; b;",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("a"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("a;"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn resolve_member_expression_references_to_array_index_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
-            "const a=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]; a[20];",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("20"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn rewrite_for_loop_to_foreach_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::rewrite_for_loop_to_foreach::RewriteForLoopToForEach,
-            "for (i = 0; i < arr.length; i++) cond(arr[i]) || (target[arr[i]] = arr[i]);",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("arr.forEach"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("if (!cond"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("target[item]"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn rewrite_for_loop_to_foreach_nested_assignment_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::rewrite_for_loop_to_foreach::RewriteForLoopToForEach,
-            "for (n = 0; n < p.length; n++) r(i = t[s = p[n]]) || (e[s] = i);",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("p.forEach"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("if (!r(t[item]))"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("e[item] = t[item]"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn simplify_indirect_property_lookup_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::simplify_indirect_property_lookup::SimplifyIndirectPropertyLookup,
-            "m(B, e) ? B[e](arg) : fallback;",
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains("B[e](arg)"), "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(!after.contains("m(B, e)"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-
-    #[test]
-    fn simplify_chained_replace_calls_example() {
-        let (modified, before, after) = run_one_transform(
-            transforms::safe::simplify_chained_replace_calls::SimplifyChainedReplaceCalls,
-            r#"e.replace("\\", "").replace(/\\(\[)|\\(\])|\[([^\]\[]*)\]|\\(.)/g, function(e, t, n, s, i) { return t || n || s || i; });"#,
-        );
-        assert!(modified, "before:\n{before}\n\nafter:\n{after}\n");
-        assert!(after.contains(r"replace(/\\?\[|\]|\\(.)/g"), "before:\n{before}\n\nafter:\n{after}\n");
-    }
-}
-
+mod tests;
 pub struct Restringer {
     normalize: bool,
     max_iterations: usize,
@@ -310,11 +32,6 @@ impl Default for Restringer {
                 Box::new(transforms::safe::resolve_proxy_variables::ResolveProxyVariables),
                 Box::new(transforms::safe::resolve_proxy_calls::ResolveProxyCalls),
                 Box::new(transforms::safe::resolve_proxy_references::ResolveProxyReferences),
-                Box::new(transforms::safe::resolve_string_array_decoder_calls::ResolveStringArrayDecoderCalls),
-                Box::new(transforms::safe::resolve_dispatch_table_calls::ResolveDispatchTableCalls),
-                Box::new(transforms::safe::normalize_webpack_require_var_to_const::NormalizeWebpackRequireVarToConst),
-                Box::new(transforms::safe::replace_function_return_this::ReplaceFunctionReturnThis),
-                Box::new(transforms::safe::rewrite_for_loop_to_foreach::RewriteForLoopToForEach),
                 Box::new(
                     transforms::safe::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
                 ),
@@ -323,14 +40,9 @@ impl Default for Restringer {
                 ),
                 Box::new(transforms::safe::normalize_computed::NormalizeComputed),
                 Box::new(transforms::safe::normalize_empty_statements::NormalizeEmptyStatements),
-                Box::new(transforms::safe::normalize_void0::NormalizeVoid0),
-                Box::new(transforms::safe::simplify_jsfuck_booleans::SimplifyJsFuckBooleans),
-                Box::new(transforms::safe::simplify_double_negation::SimplifyDoubleNegation),
                 Box::new(transforms::safe::remove_redundant_block_statements::RemoveRedundantBlockStatements),
                 Box::new(transforms::safe::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
                 Box::new(transforms::safe::unwrap_simple_operations::UnwrapSimpleOperations),
-                Box::new(transforms::safe::fold_string_concatenation::FoldStringConcatenation),
-                Box::new(transforms::safe::fold_string_from_char_codes::FoldStringFromCharCodes),
                 Box::new(
                     transforms::safe::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
                 ),
@@ -342,11 +54,7 @@ impl Default for Restringer {
                     transforms::safe::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
                 ),
                 Box::new(transforms::safe::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
-                Box::new(transforms::safe::simplify_module_factory_call::SimplifyModuleFactoryCall),
-                Box::new(transforms::safe::unwrap_bind_null_literal::UnwrapBindNullLiteral),
                 Box::new(transforms::safe::simplify_calls::SimplifyCalls),
-                Box::new(transforms::safe::simplify_indirect_property_lookup::SimplifyIndirectPropertyLookup),
-                Box::new(transforms::safe::simplify_chained_replace_calls::SimplifyChainedReplaceCalls),
                 Box::new(
                     transforms::safe::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
                 ),
@@ -357,10 +65,6 @@ impl Default for Restringer {
                     transforms::safe::replace_new_func_calls_with_literal_content::ReplaceNewFuncCallsWithLiteralContent,
                 ),
                 Box::new(transforms::safe::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue),
-                Box::new(transforms::safe::unwrap_iife_returning_identifier::UnwrapIifeReturningIdentifier),
-                Box::new(transforms::safe::simplify_babel_class_helpers::SimplifyBabelClassHelpers),
-                Box::new(transforms::safe::simplify_babel_spread_helper::SimplifyBabelSpreadHelper),
-                Box::new(transforms::safe::simplify_babel_es5_class_to_class::SimplifyBabelEs5ClassToClass),
                 Box::new(
                     transforms::safe::replace_identifier_with_fixed_value_not_assigned_at_declaration::ReplaceIdentifierWithFixedValueNotAssignedAtDeclaration,
                 ),
@@ -449,11 +153,88 @@ impl Restringer {
         self.max_iterations
     }
 
+    pub fn apply_modules_to_code(
+        &self,
+        source_text: &str,
+        modules: Vec<Box<dyn Transform>>,
+        opts: DeobfuscateOptions,
+    ) -> Result<String, Error> {
+        let allocator = Allocator::default();
+        let start = Instant::now();
+
+        let check_timeout = || -> Result<(), Error> {
+            if let Some(timeout) = opts.timeout {
+                if start.elapsed() >= timeout {
+                    return Err(Error::Timeout);
+                }
+            }
+            Ok(())
+        };
+
+        let source_type = if let Some(st) = opts.source_type {
+            st
+        } else if let Some(path) = opts.filename_for_source_type.as_ref() {
+            SourceType::from_path(path)
+                .map_err(|e| Error::InvalidSourceType { path: path.clone(), message: e.to_string() })?
+        } else {
+            SourceType::mjs()
+        };
+
+        let max_iterations = opts.max_iterations.unwrap_or(self.max_iterations);
+
+        check_timeout()?;
+
+        let parse_ret = Parser::new(&allocator, source_text, source_type)
+            .with_options(self.parse_options)
+            .parse();
+
+        if !parse_ret.errors.is_empty() {
+            return Err(Error::ParseFailed);
+        }
+
+        let mut program = parse_ret.program;
+
+        if !modules.is_empty() {
+            for _ in 0..max_iterations {
+                check_timeout()?;
+                let mut modified_iter = false;
+                let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
+                for t in &modules {
+                    check_timeout()?;
+                    if t.run(&mut ctx, &mut program) {
+                        modified_iter = true;
+                    }
+                }
+                if !modified_iter {
+                    break;
+                }
+            }
+        }
+
+        check_timeout()?;
+
+        let CodegenReturn { code, .. } = Codegen::new()
+            .with_options(self.codegen_options.clone())
+            .with_source_text(source_text)
+            .build(&program);
+
+        Ok(code)
+    }
+
+    pub fn apply_module_to_code(
+        &self,
+        source_text: &str,
+        module: Box<dyn Transform>,
+        opts: DeobfuscateOptions,
+    ) -> Result<String, Error> {
+        self.apply_modules_to_code(source_text, vec![module], opts)
+    }
+
     pub fn deobfuscate(&self, source_text: &str, opts: DeobfuscateOptions) -> Result<DeobfuscateResult, Error> {
         let allocator = Allocator::default();
         let start = Instant::now();
 
-        let mut check_timeout = || -> Result<(), Error> {
+        let check_timeout = || -> Result<(), Error> {
             if let Some(timeout) = opts.timeout {
                 if start.elapsed() >= timeout {
                     return Err(Error::Timeout);

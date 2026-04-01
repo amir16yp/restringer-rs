@@ -1,3 +1,5 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use oxc_allocator::Box as ArenaBox;
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
@@ -58,6 +60,7 @@ impl<'a> Visitor<'a> {
         let s = self.allocator.alloc_str(s);
         Expression::StringLiteral(ArenaBox::new_in(
             StringLiteral {
+                node_id: Cell::new(NodeId::DUMMY),
                 span,
                 value: s.into(),
                 raw: None,

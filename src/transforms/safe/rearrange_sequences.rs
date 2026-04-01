@@ -1,3 +1,5 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use oxc_allocator::{Box as ArenaBox, CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
@@ -33,7 +35,7 @@ impl<'a> Visitor<'a> {
                 break;
             }
             extracted.push(Statement::ExpressionStatement(ArenaBox::new_in(
-                ExpressionStatement { span, expression: expr.clone_in(self.allocator) },
+                ExpressionStatement { node_id: Cell::new(NodeId::DUMMY), span, expression: expr.clone_in(self.allocator) },
                 self.allocator,
             )));
         }
@@ -42,7 +44,7 @@ impl<'a> Visitor<'a> {
             .get(last_idx)
             .map(|e| e.clone_in(self.allocator))
             .unwrap_or_else(|| {
-                Expression::NullLiteral(ArenaBox::new_in(NullLiteral { span }, self.allocator))
+                Expression::NullLiteral(ArenaBox::new_in(NullLiteral { node_id: Cell::new(NodeId::DUMMY), span }, self.allocator))
             });
         (extracted, last_expr)
     }

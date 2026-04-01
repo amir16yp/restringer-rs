@@ -1,3 +1,5 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use oxc_allocator::{Box as ArenaBox, CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
@@ -27,6 +29,7 @@ impl<'a> Visitor<'a> {
     fn invert_test(&self, span: oxc_span::Span, test: &Expression<'a>) -> Expression<'a> {
         Expression::UnaryExpression(ArenaBox::new_in(
             UnaryExpression {
+                node_id: Cell::new(NodeId::DUMMY),
                 span,
                 operator: oxc_syntax::operator::UnaryOperator::LogicalNot,
                 argument: test.clone_in(self.allocator),
@@ -47,6 +50,7 @@ impl<'a> Visitor<'a> {
 
                     let right_stmt = Statement::ExpressionStatement(ArenaBox::new_in(
                         ExpressionStatement {
+                            node_id: Cell::new(NodeId::DUMMY),
                             span: expr_stmt.span,
                             expression: logical.right.clone_in(self.allocator),
                         },
@@ -57,12 +61,13 @@ impl<'a> Visitor<'a> {
                     body.push(right_stmt);
 
                     let consequent = Statement::BlockStatement(ArenaBox::new_in(
-                        BlockStatement { span: expr_stmt.span, body, scope_id: Default::default() },
+                        BlockStatement { node_id: Cell::new(NodeId::DUMMY), span: expr_stmt.span, body, scope_id: Default::default() },
                         self.allocator,
                     ));
 
                     let if_stmt = Statement::IfStatement(ArenaBox::new_in(
                         IfStatement {
+                            node_id: Cell::new(NodeId::DUMMY),
                             span: expr_stmt.span,
                             test,
                             consequent,

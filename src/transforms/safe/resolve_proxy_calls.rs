@@ -1,6 +1,7 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use std::collections::HashMap;
-
-use oxc_allocator::Box as ArenaBox;
+use oxc_allocator::{Box as ArenaBox};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_syntax::scope::ScopeFlags;
@@ -71,7 +72,7 @@ impl<'a> Visitor<'a> {
     fn make_ident_expr(&self, span: oxc_span::Span, name: &str) -> Expression<'a> {
         let name = self.allocator.alloc_str(name);
         Expression::Identifier(ArenaBox::new_in(
-            IdentifierReference { span, name: name.into(), reference_id: None.into() },
+            IdentifierReference { node_id: Cell::new(NodeId::DUMMY), span, name: name.into(), reference_id: None.into() },
             self.allocator,
         ))
     }

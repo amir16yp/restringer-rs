@@ -1,3 +1,5 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use oxc_allocator::{Box as ArenaBox, CloneIn};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
@@ -40,7 +42,7 @@ fn is_valid_identifier(name: &str) -> bool {
 impl<'a> Visitor<'a> {
     fn make_identifier_name(&self, span: oxc_span::Span, name: &str) -> IdentifierName<'a> {
         let name = self.allocator.alloc_str(name);
-        IdentifierName { span, name: name.into() }
+        IdentifierName { node_id: Cell::new(NodeId::DUMMY), span, name: name.into() }
     }
 }
 
@@ -55,6 +57,7 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
                         let key = self.make_identifier_name(lit.span, prop);
                         *it = MemberExpression::StaticMemberExpression(ArenaBox::new_in(
                             StaticMemberExpression {
+                                node_id: Cell::new(NodeId::DUMMY),
                                 span: c.span,
                                 object: new_obj,
                                 property: key,

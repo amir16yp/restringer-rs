@@ -1,8 +1,10 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_parser::{ParseOptions, Parser};
-use oxc_span::SourceType;
+use oxc_span::{SourceType};
 
 use crate::{Transform, TransformCtx};
 
@@ -71,11 +73,11 @@ impl<'a> Visitor<'a> {
         }
 
         if body.len() > 1 {
-            let mut out = ArenaVec::new_in(self.allocator);
+            let mut out = ArenaVec::<Statement<'a>>::new_in(self.allocator);
             for s in body {
                 out.push(s.clone_in(self.allocator));
             }
-            return Some(Replacement::Block(BlockStatement { span, body: out, scope_id: Default::default() }));
+            return Some(Replacement::Block(BlockStatement { node_id: Cell::new(NodeId::DUMMY), span, body: out, scope_id: Default::default() }));
         }
 
         let stmt = &body[0];

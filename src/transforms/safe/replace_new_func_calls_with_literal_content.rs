@@ -1,8 +1,10 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_parser::{ParseOptions, Parser};
-use oxc_span::SourceType;
+use oxc_span::{SourceType};
 
 use crate::{Transform, TransformCtx};
 
@@ -65,6 +67,7 @@ impl<'a> Visitor<'a> {
             let s = self.allocator.alloc_str(code);
             return Some(Replacement::Expr(Expression::StringLiteral(ArenaBox::new_in(
                 StringLiteral {
+                    node_id: Cell::new(NodeId::DUMMY),
                     span,
                     value: s.into(),
                     raw: None,
@@ -114,7 +117,7 @@ impl<'a> Visitor<'a> {
             for s in body.iter() {
                 out.push(s.clone_in(self.allocator));
             }
-            return Some(Replacement::Block(BlockStatement { span, body: out, scope_id: Default::default() }));
+            return Some(Replacement::Block(BlockStatement { node_id: Cell::new(NodeId::DUMMY), span, body: out, scope_id: Default::default() }));
         }
 
         let stmt = &body[0];

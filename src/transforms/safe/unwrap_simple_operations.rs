@@ -1,9 +1,12 @@
+use std::cell::Cell;
+use oxc_syntax::node::NodeId;
 use std::collections::HashMap;
 
 use oxc_allocator::{Box as ArenaBox, CloneIn};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_span::Span;
+use oxc_syntax::operator::{BinaryOperator, LogicalOperator};
 use oxc_syntax::scope::ScopeFlags;
 
 use crate::{Transform, TransformCtx};
@@ -141,14 +144,14 @@ struct Rewriter<'a> {
 impl<'a> Rewriter<'a> {
     fn make_binary_expr(&self, span: Span, op: BinaryOperator, left: Expression<'a>, right: Expression<'a>) -> Expression<'a> {
         Expression::BinaryExpression(ArenaBox::new_in(
-            BinaryExpression { span, operator: op, left, right },
+            BinaryExpression { node_id: Cell::new(NodeId::DUMMY), span, operator: op, left, right },
             self.allocator,
         ))
     }
 
     fn make_logical_expr(&self, span: Span, op: LogicalOperator, left: Expression<'a>, right: Expression<'a>) -> Expression<'a> {
         Expression::LogicalExpression(ArenaBox::new_in(
-            LogicalExpression { span, operator: op, left, right },
+            LogicalExpression { node_id: Cell::new(NodeId::DUMMY), span, operator: op, left, right },
             self.allocator,
         ))
     }
@@ -160,7 +163,7 @@ impl<'a> Rewriter<'a> {
         argument: Expression<'a>,
     ) -> Expression<'a> {
         Expression::UnaryExpression(ArenaBox::new_in(
-            UnaryExpression { span, operator: op, argument },
+            UnaryExpression { node_id: Cell::new(NodeId::DUMMY), span, operator: op, argument },
             self.allocator,
         ))
     }
