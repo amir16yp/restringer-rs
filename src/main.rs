@@ -48,6 +48,10 @@ struct Cli {
     /// Abort deobfuscation after N seconds (disabled by default)
     #[arg(long = "timeout-seconds")]
     timeout_seconds: Option<u64>,
+
+    /// Enable unsafe transforms (uses JavaScript runtime to evaluate expressions)
+    #[arg(short = 'u', long = "unsafe")]
+    run_unsafe: bool,
 }
 
 fn main() {
@@ -99,7 +103,7 @@ fn main() {
         &source_text,
         DeobfuscateOptions {
             clean: cli.clean,
-            run_unsafe: false,
+            run_unsafe: cli.run_unsafe,
             max_iterations: cli.max_iterations,
             timeout: cli.timeout_seconds.map(Duration::from_secs),
             source_type: Some(source_type),
