@@ -197,3 +197,54 @@ mod eval_constant_expressions {
         assert_transform("EvalConstantExpressions", code, expected, &result);
     }
 }
+
+#[cfg(test)]
+mod resolve_local_calls {
+    use super::*;
+    use crate::transforms::unsafe_transforms::resolve_local_calls::ResolveLocalCalls;
+
+    #[test]
+    fn test_resolve_local_calls_simple() {
+        let code = "function add(a, b) { return a + b; } const res = add(5, 10);";
+        let expected = "function add(a, b) {\n\treturn a + b;\n}\nconst res = 15;\n";
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert_transform("ResolveLocalCalls", code, expected, &result);
+    }
+}
+
+#[cfg(test)]
+mod resolve_augmented_function_wrapped_array_replacements {
+    use super::*;
+    use crate::transforms::unsafe_transforms::resolve_augmented_function_wrapped_array_replacements::ResolveAugmentedFunctionWrappedArrayReplacements;
+
+    #[test]
+    fn test_resolve_augmented_array_simple() {
+        let code = r#"
+            var arr = ["first", "second", "third"];
+            (function(a, count) {
+                a.push(a.shift());
+            })(arr, 1);
+        "#;
+        let expected = "var arr = [\n\t\"second\",\n\t\"third\",\n\t\"first\"\n];\n";
+        let result = apply_module_to_code(code, Box::new(ResolveAugmentedFunctionWrappedArrayReplacements::new()));
+        assert_transform("ResolveAugmentedFunctionWrappedArrayReplacements", code, expected, &result);
+    }
+}
+
+#[cfg(test)]
+mod resolve_builtin_calls {
+    use super::*;
+    use crate::transforms::unsafe_transforms::resolve_builtin_calls::ResolveBuiltinCalls;
+
+    #[test]
+    fn test_resolve_builtin_calls_simple() {
+        let code = r#"
+            const a = atob("SGVsbG8=");
+            const b = "foo,bar".split(",");
+            const c = [1, 2, 3].join("-");
+        "#;
+        let expected = "const a = \"Hello\";\nconst b = [\"foo\", \"bar\"];\nconst c = \"1-2-3\";\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
+        assert_transform("ResolveBuiltinCalls", code, expected, &result);
+    }
+}

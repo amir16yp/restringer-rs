@@ -83,6 +83,9 @@ impl Default for Restringer {
             ],
             unsafe_transforms: vec![
                 Box::new(transforms::unsafe_transforms::EvalConstantExpressions::new()),
+                Box::new(transforms::unsafe_transforms::ResolveLocalCalls::new()),
+                Box::new(transforms::unsafe_transforms::ResolveAugmentedFunctionWrappedArrayReplacements::new()),
+                Box::new(transforms::unsafe_transforms::ResolveBuiltinCalls::new()),
             ],
         }
     }

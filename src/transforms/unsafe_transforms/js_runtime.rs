@@ -60,6 +60,36 @@ impl JsEvaluator {
         })
     }
 
+    /// Evaluates `code` and returns the result serialized as JSON.
+    /// Errors if the result is undefined, a function, or not JSON-serializable.
+    /// Strings are returned as `"..."`, numbers as `42`, arrays as `[...]`, etc.,
+    /// so the caller can re-parse the JSON text as a JS expression to get an
+    /// exactly-typed literal replacement.
+    pub fn eval_to_json(&self, code: &str) -> Result<String, String> {
+        let runtime = self.runtime.lock().unwrap();
+        let context = Context::full(&runtime).map_err(|e| format!("Failed to create context: {}", e))?;
+
+        context.with(|ctx| {
+            let result: rquickjs::Value = ctx.eval(code)
+                .map_err(|e| {
+                    let detail = ctx.catch();
+                    format!("JavaScript evaluation error: {} ({:?})", e, detail)
+                })?;
+
+            if result.is_undefined() {
+                return Err("Result is undefined".to_string());
+            }
+            if result.is_function() {
+                return Err("Result is a function".to_string());
+            }
+
+            ctx.json_stringify(result)
+                .map_err(|e| format!("Failed to stringify result: {}", e))?
+                .and_then(|s| s.to_string().ok())
+                .ok_or_else(|| "Failed to stringify result".to_string())
+        })
+    }
+
     pub fn eval_to_bool(&self, code: &str) -> Result<bool, String> {
         let runtime = self.runtime.lock().unwrap();
         let context = Context::full(&runtime).map_err(|e| format!("Failed to create context: {}", e))?;
