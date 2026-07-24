@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use oxc_ast::ast::*;
 use oxc_ast_visit::{Visit, VisitMut};
+use std::collections::HashSet;
 
 use crate::{Transform, TransformCtx};
 

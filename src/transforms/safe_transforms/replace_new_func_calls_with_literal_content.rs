@@ -1,10 +1,10 @@
-use std::cell::Cell;
-use oxc_syntax::node::NodeId;
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_parser::{ParseOptions, Parser};
-use oxc_span::{SourceType};
+use oxc_span::SourceType;
+use oxc_syntax::node::NodeId;
+use std::cell::Cell;
 
 use crate::{Transform, TransformCtx};
 

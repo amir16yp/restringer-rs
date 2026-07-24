@@ -1,11 +1,11 @@
-use crate::{DeobfuscateOptions, Restringer};
-use crate::transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements;
-use crate::transforms::safe_transforms::remove_dead_nodes::RemoveDeadNodes;
 use crate::transforms::safe_transforms::normalize_computed::NormalizeComputed;
 use crate::transforms::safe_transforms::normalize_empty_statements::NormalizeEmptyStatements;
 use crate::transforms::safe_transforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals;
 use crate::transforms::safe_transforms::rearrange_sequences::RearrangeSequences;
 use crate::transforms::safe_transforms::rearrange_switches::RearrangeSwitches;
+use crate::transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements;
+use crate::transforms::safe_transforms::resolve_builtin_string_calls::ResolveBuiltinStringCalls;
+use crate::{DeobfuscateOptions, Restringer};
 
 fn apply_module_to_code(code: &str, transform: Box<dyn crate::Transform>) -> String {
     let restringer = Restringer::default();
@@ -464,5 +464,66 @@ mod resolve_jsfuck_primitives {
         let result = apply_module_to_code_looped(code, Box::new(ResolveJSFuckPrimitives));
         // Should simplify to "f" (may have parentheses from codegen)
         assert!(result.contains("\"f\""), "Expected result to contain '\"f\"', got: {}", result);
+    }
+}
+
+#[cfg(test)]
+mod resolve_builtin_string_calls {
+    use super::*;
+
+    #[test]
+    fn tp_1_resolve_char_at() {
+        let code = r#""hello".charAt(1);"#;
+        let expected = "(\"e\");\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_2_resolve_char_at_out_of_bounds() {
+        let code = r#""hi".charAt(10);"#;
+        let expected = "(\"\");\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_3_resolve_from_char_code_single() {
+        let code = r#"String.fromCharCode(65);"#;
+        let expected = "(\"A\");\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_4_resolve_from_char_code_multiple() {
+        let code = r#"String.fromCharCode(72, 101, 108, 108, 111);"#;
+        let expected = "(\"Hello\");\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_5_resolve_computed_members() {
+        let code = r#""abc"['charAt'](2); String['fromCharCode'](97);"#;
+        let expected = "(\"c\");\n\"a\";\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tn_1_no_resolve_with_non_literal_argument() {
+        let code = r#""abc".charAt(i);"#;
+        let expected = "\"abc\".charAt(i);\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tn_2_no_resolve_with_non_literal_object() {
+        let code = r#"x.charAt(0);"#;
+        let expected = "x.charAt(0);\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
     }
 }

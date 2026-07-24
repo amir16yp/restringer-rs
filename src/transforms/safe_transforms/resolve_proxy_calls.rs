@@ -1,10 +1,10 @@
-use std::cell::Cell;
-use oxc_syntax::node::NodeId;
-use std::collections::HashMap;
-use oxc_allocator::{Box as ArenaBox};
+use oxc_allocator::Box as ArenaBox;
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
+use oxc_syntax::node::NodeId;
 use oxc_syntax::scope::ScopeFlags;
+use std::cell::Cell;
+use std::collections::HashMap;
 
 use crate::{Transform, TransformCtx};
 

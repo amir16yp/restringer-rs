@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use rquickjs::{Context, Runtime};
+use std::sync::Mutex;
 
 pub struct QuickJsEngine {
     runtime: Mutex<Runtime>,

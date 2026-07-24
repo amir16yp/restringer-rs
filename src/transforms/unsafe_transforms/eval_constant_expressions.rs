@@ -1,13 +1,13 @@
-use std::cell::Cell;
-use oxc_syntax::node::NodeId;
 use oxc_allocator::Box as ArenaBox;
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
-use oxc_span::{Span, GetSpan};
+use oxc_span::{GetSpan, Span};
+use oxc_syntax::node::NodeId;
+use std::cell::Cell;
 
-use crate::{Transform, TransformCtx};
 use super::js_runtime::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
+use crate::{Transform, TransformCtx};
 
 pub struct EvalConstantExpressions {
     evaluator: JsEvaluator,

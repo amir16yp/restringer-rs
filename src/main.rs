@@ -12,7 +12,7 @@ use std::time::Duration;
 use clap::{ArgGroup, Parser as ClapParser};
 use oxc_span::SourceType;
 
-use restringer_rs::{DeobfuscateOptions, Engine, Restringer, set_default_engine};
+use restringer_rs::{set_default_engine, DeobfuscateOptions, Engine, Restringer};
 
 #[derive(Debug, ClapParser)]
 #[command(name = "restringer", about = "REstringer - a JavaScript deobfuscator (Rust rewrite)")]

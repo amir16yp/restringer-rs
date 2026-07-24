@@ -2,9 +2,9 @@ use oxc_allocator::CloneIn;
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 
-use crate::{Transform, TransformCtx};
 use super::engine::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
+use crate::{Transform, TransformCtx};
 
 pub struct ResolveDeterministicConditionalExpressions {
     evaluator: JsEvaluator,

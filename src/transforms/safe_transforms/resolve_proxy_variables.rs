@@ -1,5 +1,5 @@
-use std::cell::Cell;
 use oxc_syntax::node::NodeId;
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
 use oxc_allocator::{Box as ArenaBox, CloneIn, Vec as ArenaVec};

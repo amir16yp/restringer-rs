@@ -1,10 +1,10 @@
 use oxc_ast::ast::*;
 use oxc_span::GetSpan;
 
-use crate::{Transform, TransformCtx};
 use super::helpers;
 use super::js_runtime::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
+use crate::{Transform, TransformCtx};
 
 pub struct ResolveLiteralIifeResults {
     evaluator: JsEvaluator,

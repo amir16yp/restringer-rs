@@ -1,12 +1,12 @@
-use std::collections::HashSet;
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_span::GetSpan;
+use std::collections::HashSet;
 
-use crate::{Transform, TransformCtx};
+use super::helpers;
 use super::js_runtime::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
-use super::helpers;
+use crate::{Transform, TransformCtx};
 
 pub struct ResolveLocalCalls {
     evaluator: JsEvaluator,

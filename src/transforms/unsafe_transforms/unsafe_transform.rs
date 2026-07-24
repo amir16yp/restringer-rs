@@ -1,6 +1,6 @@
-use oxc_ast::ast::*;
-use crate::Transform;
 use super::js_runtime::JsEvaluator;
+use crate::Transform;
+use oxc_ast::ast::*;
 
 pub trait UnsafeTransform: Transform {
     fn evaluator(&self) -> &JsEvaluator;

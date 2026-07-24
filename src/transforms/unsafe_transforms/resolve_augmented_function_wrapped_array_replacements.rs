@@ -2,10 +2,10 @@ use oxc_allocator::{CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 
-use crate::{Transform, TransformCtx};
+use super::helpers;
 use super::js_runtime::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
-use super::helpers;
+use crate::{Transform, TransformCtx};
 
 pub struct ResolveAugmentedFunctionWrappedArrayReplacements {
     evaluator: JsEvaluator,

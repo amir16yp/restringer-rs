@@ -3,9 +3,9 @@ use oxc_ast_visit::{Visit, VisitMut};
 use oxc_span::GetSpan;
 use oxc_syntax::operator::BinaryOperator;
 
-use crate::{Transform, TransformCtx};
 use super::engine::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
+use crate::{Transform, TransformCtx};
 
 pub struct ResolveMinimalAlphabet {
     evaluator: JsEvaluator,

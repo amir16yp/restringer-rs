@@ -2,9 +2,9 @@ use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_span::GetSpan;
 
-use crate::{Transform, TransformCtx};
 use super::engine::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
+use crate::{Transform, TransformCtx};
 
 pub struct ResolveDefiniteBinaryExpressions {
     evaluator: JsEvaluator,

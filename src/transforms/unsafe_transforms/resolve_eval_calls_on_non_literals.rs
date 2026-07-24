@@ -3,9 +3,9 @@ use oxc_ast::ast::*;
 use oxc_parser::Parser;
 use oxc_span::SourceType;
 
-use crate::{Transform, TransformCtx};
 use super::engine::JsEvaluator;
 use super::unsafe_transform::UnsafeTransform;
+use crate::{Transform, TransformCtx};
 
 pub struct ResolveEvalCallsOnNonLiterals {
     evaluator: JsEvaluator,

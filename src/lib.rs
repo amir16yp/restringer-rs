@@ -7,7 +7,7 @@ use oxc_span::SourceType;
 
 mod transforms;
 
-pub use transforms::unsafe_transforms::{Engine, set_default_engine};
+pub use transforms::unsafe_transforms::{set_default_engine, Engine};
 
 #[cfg(test)]
 mod tests;
@@ -47,6 +47,7 @@ impl Default for Restringer {
                 Box::new(
                     transforms::safe_transforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
                 ),
+                Box::new(transforms::safe_transforms::resolve_builtin_string_calls::ResolveBuiltinStringCalls),
                 Box::new(transforms::safe_transforms::resolve_deterministic_if_statements::ResolveDeterministicIfStatements),
                 Box::new(
                     transforms::safe_transforms::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
@@ -88,7 +89,6 @@ impl Default for Restringer {
                 Box::new(transforms::unsafe_transforms::ResolveMinimalAlphabet::new()),
                 Box::new(transforms::unsafe_transforms::ResolveDefiniteBinaryExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveAugmentedFunctionWrappedArrayReplacements::new()),
-                Box::new(transforms::unsafe_transforms::ResolveLiteralIifeResults::new()),
                 Box::new(transforms::unsafe_transforms::ResolveMemberExpressionsLocalReferences::new()),
                 Box::new(transforms::unsafe_transforms::ResolveDefiniteMemberExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveBuiltinCalls::new()),

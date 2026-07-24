@@ -1,6 +1,6 @@
-use crate::{DeobfuscateOptions, Restringer};
 use crate::transforms::unsafe_transforms::eval_constant_expressions::EvalConstantExpressions;
 use crate::transforms::unsafe_transforms::js_runtime::JsEvaluator;
+use crate::{DeobfuscateOptions, Restringer};
 
 fn apply_module_to_code(code: &str, transform: Box<dyn crate::Transform>) -> String {
     let restringer = Restringer::default();
