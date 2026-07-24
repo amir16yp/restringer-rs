@@ -1,5 +1,7 @@
 use std::process::Command;
 
+use super::engine::is_eval_verbose;
+
 pub struct DenoEngine;
 
 impl DenoEngine {
@@ -19,37 +21,62 @@ impl DenoEngine {
     }
 
     pub fn eval_to_string(&self, code: &str) -> Result<String, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno eval: {}", code);
+        }
         let script = format!(
             "const __v = globalThis.eval({}); console.log(String(__v));",
             escape_js_string(code)
         );
-        self.run(&script)
+        let result = self.run(&script)?;
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno result: {}", result);
+        }
+        Ok(result)
     }
 
     pub fn eval_to_number(&self, code: &str) -> Result<f64, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno eval: {}", code);
+        }
         let script = format!(
             "const __v = globalThis.eval({}); if (typeof __v !== 'number') {{ throw new Error('not a number'); }} console.log(JSON.stringify(__v));",
             escape_js_string(code)
         );
         let output = self.run(&script)?;
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno result: {}", output);
+        }
         output.parse::<f64>().map_err(|e| format!("Failed to parse Deno number output {:?}: {}", output, e))
     }
 
     pub fn eval_to_bool(&self, code: &str) -> Result<bool, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno eval: {}", code);
+        }
         let script = format!(
             "const __v = globalThis.eval({}); if (typeof __v !== 'boolean') {{ throw new Error('not a boolean'); }} console.log(JSON.stringify(__v));",
             escape_js_string(code)
         );
         let output = self.run(&script)?;
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno result: {}", output);
+        }
         output.parse::<bool>().map_err(|e| format!("Failed to parse Deno boolean output {:?}: {}", output, e))
     }
 
     pub fn eval_to_json(&self, code: &str) -> Result<String, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno eval: {}", code);
+        }
         let script = format!(
             "const __v = globalThis.eval({}); if (typeof __v === 'undefined') {{ throw new Error('undefined result'); }} if (typeof __v === 'function') {{ throw new Error('function result'); }} console.log(JSON.stringify(__v));",
             escape_js_string(code)
         );
         let output = self.run(&script)?;
+        if is_eval_verbose() {
+            eprintln!("[verbose] deno result: {}", output);
+        }
         if output.is_empty() {
             return Err("Deno produced empty output".to_string());
         }

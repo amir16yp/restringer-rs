@@ -1,6 +1,8 @@
 use rquickjs::{Context, Runtime};
 use std::sync::Mutex;
 
+use super::engine::is_eval_verbose;
+
 pub struct QuickJsEngine {
     runtime: Mutex<Runtime>,
 }
@@ -12,29 +14,39 @@ impl QuickJsEngine {
     }
 
     pub fn eval_to_string(&self, code: &str) -> Result<String, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] quickjs eval: {}", code);
+        }
         let runtime = self.runtime.lock().unwrap();
         let context = Context::full(&runtime).map_err(|e| format!("Failed to create context: {}", e))?;
 
         context.with(|ctx| {
             let result: rquickjs::Value = ctx.eval(code).map_err(|e| format!("JavaScript evaluation error: {}", e))?;
 
-            if result.is_string() {
-                result.as_string().and_then(|s| s.to_string().ok()).ok_or_else(|| "Failed to convert to string".to_string())
+            let value = if result.is_string() {
+                result.as_string().and_then(|s| s.to_string().ok()).ok_or_else(|| "Failed to convert to string".to_string())?
             } else if result.is_number() {
-                Ok(result.as_number().unwrap_or(0.0).to_string())
+                result.as_number().unwrap_or(0.0).to_string()
             } else if result.is_bool() {
-                Ok(result.as_bool().unwrap_or(false).to_string())
+                result.as_bool().unwrap_or(false).to_string()
             } else if result.is_null() {
-                Ok("null".to_string())
+                "null".to_string()
             } else if result.is_undefined() {
-                Ok("undefined".to_string())
+                "undefined".to_string()
             } else {
-                ctx.json_stringify(result).ok().flatten().and_then(|s| s.to_string().ok()).ok_or_else(|| "Failed to stringify result".to_string())
+                ctx.json_stringify(result).ok().flatten().and_then(|s| s.to_string().ok()).ok_or_else(|| "Failed to stringify result".to_string())?
+            };
+            if is_eval_verbose() {
+                eprintln!("[verbose] quickjs result: {}", value);
             }
+            Ok(value)
         })
     }
 
     pub fn eval_to_number(&self, code: &str) -> Result<f64, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] quickjs eval: {}", code);
+        }
         let runtime = self.runtime.lock().unwrap();
         let context = Context::full(&runtime).map_err(|e| format!("Failed to create context: {}", e))?;
 
@@ -42,7 +54,11 @@ impl QuickJsEngine {
             let result: rquickjs::Value = ctx.eval(code).map_err(|e| format!("JavaScript evaluation error: {}", e))?;
 
             if result.is_number() {
-                Ok(result.as_number().unwrap_or(0.0))
+                let value = result.as_number().unwrap_or(0.0);
+                if is_eval_verbose() {
+                    eprintln!("[verbose] quickjs result: {}", value);
+                }
+                Ok(value)
             } else {
                 Err("Result is not a number".to_string())
             }
@@ -50,6 +66,9 @@ impl QuickJsEngine {
     }
 
     pub fn eval_to_bool(&self, code: &str) -> Result<bool, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] quickjs eval: {}", code);
+        }
         let runtime = self.runtime.lock().unwrap();
         let context = Context::full(&runtime).map_err(|e| format!("Failed to create context: {}", e))?;
 
@@ -57,7 +76,11 @@ impl QuickJsEngine {
             let result: rquickjs::Value = ctx.eval(code).map_err(|e| format!("JavaScript evaluation error: {}", e))?;
 
             if result.is_bool() {
-                Ok(result.as_bool().unwrap_or(false))
+                let value = result.as_bool().unwrap_or(false);
+                if is_eval_verbose() {
+                    eprintln!("[verbose] quickjs result: {}", value);
+                }
+                Ok(value)
             } else {
                 Err("Result is not a boolean".to_string())
             }
@@ -65,6 +88,9 @@ impl QuickJsEngine {
     }
 
     pub fn eval_to_json(&self, code: &str) -> Result<String, String> {
+        if is_eval_verbose() {
+            eprintln!("[verbose] quickjs eval: {}", code);
+        }
         let runtime = self.runtime.lock().unwrap();
         let context = Context::full(&runtime).map_err(|e| format!("Failed to create context: {}", e))?;
 
@@ -81,10 +107,14 @@ impl QuickJsEngine {
                 return Err("Result is a function".to_string());
             }
 
-            ctx.json_stringify(result)
+            let value = ctx.json_stringify(result)
                 .map_err(|e| format!("Failed to stringify result: {}", e))?
                 .and_then(|s| s.to_string().ok())
-                .ok_or_else(|| "Failed to stringify result".to_string())
+                .ok_or_else(|| "Failed to stringify result".to_string())?;
+            if is_eval_verbose() {
+                eprintln!("[verbose] quickjs result: {}", value);
+            }
+            Ok(value)
         })
     }
 }

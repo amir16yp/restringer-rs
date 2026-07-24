@@ -110,6 +110,7 @@ pub struct DeobfuscateOptions {
     pub timeout: Option<Duration>,
     pub source_type: Option<SourceType>,
     pub filename_for_source_type: Option<PathBuf>,
+    pub verbose: bool,
 }
 
 impl Default for DeobfuscateOptions {
@@ -121,6 +122,7 @@ impl Default for DeobfuscateOptions {
             timeout: None,
             source_type: None,
             filename_for_source_type: None,
+            verbose: false,
         }
     }
 }
@@ -178,6 +180,7 @@ impl Restringer {
         modules: Vec<Box<dyn Transform>>,
         opts: DeobfuscateOptions,
     ) -> Result<String, Error> {
+        transforms::unsafe_transforms::engine::set_eval_verbose(opts.verbose);
         let allocator = Allocator::default();
         let start = Instant::now();
 
@@ -250,6 +253,7 @@ impl Restringer {
     }
 
     pub fn deobfuscate(&self, source_text: &str, opts: DeobfuscateOptions) -> Result<DeobfuscateResult, Error> {
+        transforms::unsafe_transforms::engine::set_eval_verbose(opts.verbose);
         let allocator = Allocator::default();
         let start = Instant::now();
 
@@ -288,21 +292,36 @@ impl Restringer {
 
         // Milestone 2: implement loop semantics, even if there are no transforms yet.
         let mut modified_this_round;
+        let mut round = 0;
         loop {
+            round += 1;
             check_timeout()?;
             modified_this_round = false;
 
             // Phase 1: apply safe_transforms transforms iteratively up to max_iterations.
             if !self.safe_transforms.is_empty() {
-                for _ in 0..max_iterations {
+                for safe_iter in 1..=max_iterations {
                     check_timeout()?;
                     let mut modified_iter = false;
+                    let mut changed_names = Vec::new();
                     let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                     for t in &self.safe_transforms {
                         check_timeout()?;
                         if t.run(&mut ctx, &mut program) {
                             modified_iter = true;
+                            changed_names.push(t.name());
                         }
+                    }
+                    if opts.verbose {
+                        eprintln!(
+                            "[verbose] round {round} safe iteration {safe_iter}: {} change(s){}",
+                            changed_names.len(),
+                            if changed_names.is_empty() {
+                                String::new()
+                            } else {
+                                format!(" ({})", changed_names.join(", "))
+                            }
+                        );
                     }
                     if modified_iter {
                         modified_this_round = true;
@@ -317,16 +336,29 @@ impl Restringer {
             if opts.run_unsafe && !self.unsafe_transforms.is_empty() {
                 check_timeout()?;
                 let mut modified_iter = false;
+                let mut changed_names = Vec::new();
                 let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
                 for t in &self.unsafe_transforms {
                     check_timeout()?;
                     if t.run(&mut ctx, &mut program) {
                         modified_iter = true;
+                        changed_names.push(t.name());
                     }
                 }
                 if modified_iter {
                     modified_this_round = true;
                     modified_any = true;
+                }
+                if opts.verbose {
+                    eprintln!(
+                        "[verbose] round {round} unsafe pass: {} change(s){}",
+                        changed_names.len(),
+                        if changed_names.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" ({})", changed_names.join(", "))
+                        }
+                    );
                 }
             }
 

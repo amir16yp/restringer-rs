@@ -127,6 +127,7 @@ fn main() {
             timeout: cli.timeout_seconds.map(Duration::from_secs),
             source_type: Some(source_type),
             filename_for_source_type: None,
+            verbose: cli.verbose,
         },
     ) {
         Ok(r) => r,

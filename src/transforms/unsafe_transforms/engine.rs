@@ -1,7 +1,7 @@
 #[cfg(not(any(feature = "unsafe-transform-quickjs", feature = "unsafe-transform-deno")))]
 compile_error!("One of the features `unsafe-transform-quickjs` or `unsafe-transform-deno` must be enabled");
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Engine {
@@ -25,6 +25,15 @@ const ENGINE_QUICKJS: u8 = 1;
 const ENGINE_DENO: u8 = 2;
 
 static SELECTED_ENGINE: AtomicU8 = AtomicU8::new(ENGINE_UNSET);
+static VERBOSE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_eval_verbose(verbose: bool) {
+    VERBOSE.store(verbose, Ordering::Relaxed);
+}
+
+pub fn is_eval_verbose() -> bool {
+    VERBOSE.load(Ordering::Relaxed)
+}
 
 impl Engine {
     fn to_u8(self) -> u8 {
