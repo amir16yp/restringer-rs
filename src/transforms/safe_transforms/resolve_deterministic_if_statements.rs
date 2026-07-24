@@ -67,8 +67,9 @@ fn equal_value(left: &KnownValue, right: &KnownValue) -> Option<bool> {
             }
         }
         (KnownValue::String(a), KnownValue::String(b)) => Some(a == b),
-        (KnownValue::Null, KnownValue::Null)
-        | (KnownValue::Undefined, KnownValue::Undefined) => Some(true),
+        (KnownValue::Null, KnownValue::Null) | (KnownValue::Undefined, KnownValue::Undefined) => {
+            Some(true)
+        }
         _ => Some(false),
     }
 }
@@ -148,7 +149,10 @@ fn equal_false(value: &KnownValue) -> Option<bool> {
     }
 }
 
-fn deterministic_condition(expr: &Expression<'_>, known: &[HashMap<String, KnownValue>]) -> Option<bool> {
+fn deterministic_condition(
+    expr: &Expression<'_>,
+    known: &[HashMap<String, KnownValue>],
+) -> Option<bool> {
     if let Expression::UnaryExpression(un) = expr {
         use oxc_syntax::operator::UnaryOperator;
         if un.operator == UnaryOperator::LogicalNot {

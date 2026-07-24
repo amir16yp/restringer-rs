@@ -81,11 +81,16 @@ impl<'a> Visitor<'a> {
         self.arrays.pop();
     }
 
-    fn current_scope(&mut self) -> &mut HashMap<String, oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
+    fn current_scope(
+        &mut self,
+    ) -> &mut HashMap<String, oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
         self.arrays.last_mut().unwrap()
     }
 
-    fn lookup_array(&self, name: &str) -> Option<&oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
+    fn lookup_array(
+        &self,
+        name: &str,
+    ) -> Option<&oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
         for scope in self.arrays.iter().rev() {
             if let Some(el) = scope.get(name) {
                 return Some(el);
@@ -171,7 +176,6 @@ impl<'a> Visitor<'a> {
         let expr = el.as_expression()?;
         Some(expr.clone_in(self.allocator))
     }
-
 }
 
 impl<'a> VisitMut<'a> for Visitor<'a> {
@@ -243,5 +247,4 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
 
         oxc_ast_visit::walk_mut::walk_expression(self, it);
     }
-
 }

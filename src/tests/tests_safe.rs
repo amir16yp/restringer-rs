@@ -1,10 +1,10 @@
 use crate::transforms::safe_transforms::inline_paired_array_pushes::InlinePairedArrayPushes;
+use crate::transforms::safe_transforms::inline_simple_aliases::InlineSimpleAliases;
 use crate::transforms::safe_transforms::normalize_computed::NormalizeComputed;
 use crate::transforms::safe_transforms::normalize_empty_statements::NormalizeEmptyStatements;
 use crate::transforms::safe_transforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals;
 use crate::transforms::safe_transforms::rearrange_sequences::RearrangeSequences;
 use crate::transforms::safe_transforms::rearrange_switches::RearrangeSwitches;
-use crate::transforms::safe_transforms::inline_simple_aliases::InlineSimpleAliases;
 use crate::transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements;
 use crate::transforms::safe_transforms::resolve_builtin_string_calls::ResolveBuiltinStringCalls;
 use crate::transforms::safe_transforms::resolve_deterministic_if_statements::ResolveDeterministicIfStatements;
@@ -563,6 +563,83 @@ mod resolve_builtin_string_calls {
     }
 
     #[test]
+    fn tp_6_resolve_char_code_at() {
+        let code = r#""hello".charCodeAt(1);"#;
+        let expected = "101;\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_7_resolve_literal_string_slices() {
+        let code = r#""abcdef".slice(1, -1); "abcdef".substring(4, 1); "abcdef".substr(-3, 2);"#;
+        let expected = "(\"bcde\");\n\"bcd\";\n\"de\";\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_8_resolve_concat_and_repeat() {
+        let code = r#""a".concat("b", "c"); "xy"['repeat'](3);"#;
+        let expected = r#"("abc");
+"xyxyxy";
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_9_resolve_from_code_point() {
+        let code = r#"String.fromCodePoint(65, 0x1F600);"#;
+        let expected = r#"("A😀");
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_10_char_at_defaults_to_zero() {
+        let code = r#""abc".charAt();"#;
+        let expected = r#"("a");
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_11_resolve_index_searches_with_utf16_offsets() {
+        let code = r#""😀abcabc".indexOf("a"); "😀abcabc".lastIndexOf("a"); "abc".indexOf("z");"#;
+        let expected = r#"2;
+5;
+-1;
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_12_resolve_boolean_searches() {
+        let code = r#""abcdef".includes("cd"); "abcdef".startsWith("cd", 2); "abcdef"['endsWith']("cd", 4);"#;
+        let expected = r#"true;
+true;
+true;
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_13_resolve_empty_search_and_clamped_positions() {
+        let code = r#""abc".indexOf("", 99); "abc".lastIndexOf("", -4); "abc".includes("a", -2);"#;
+        let expected = r#"3;
+0;
+true;
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
     fn tn_1_no_resolve_with_non_literal_argument() {
         let code = r#""abc".charAt(i);"#;
         let expected = "\"abc\".charAt(i);\n";
@@ -571,7 +648,26 @@ mod resolve_builtin_string_calls {
     }
 
     #[test]
-    fn tn_2_no_resolve_with_non_literal_object() {
+    fn tn_2_no_resolve_search_with_non_literal_argument() {
+        let code = r#""abc".indexOf(needle); "abc".includes("a", position);"#;
+        let expected = r#""abc".indexOf(needle);
+"abc".includes("a", position);
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_14_resolve_reversed_slice_to_empty_string() {
+        let code = r#""abcdef".slice(4, 1);"#;
+        let expected = r#"("");
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tn_3_no_resolve_with_non_literal_object() {
         let code = r#"x.charAt(0);"#;
         let expected = "x.charAt(0);\n";
         let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
@@ -733,14 +829,22 @@ mod resolve_var_string_arrays {
     fn tp_1_resolves_array_in_nested_function_body() {
         let code = r#"(function () { var arr = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v"]; function inner() { console.log(arr[0]); } inner(); })();"#;
         let result = apply_module_to_code(code, Box::new(ResolveVarStringArrays));
-        assert!(result.contains("console.log(\"a\")"), "expected array lookup to resolve in nested function; got: {}", result);
+        assert!(
+            result.contains("console.log(\"a\")"),
+            "expected array lookup to resolve in nested function; got: {}",
+            result
+        );
     }
 
     #[test]
     fn tp_2_resolves_array_index_in_assignment_target() {
         let code = r#"(function () { var arr = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","rot13"]; String.prototype[arr[22]] = function () { return this; }; })();"#;
         let result = apply_module_to_code(code, Box::new(ResolveVarStringArrays));
-        assert!(result.contains("String.prototype[\"rot13\"]"), "expected assignment target property to resolve; got: {}", result);
+        assert!(
+            result.contains("String.prototype[\"rot13\"]"),
+            "expected assignment target property to resolve; got: {}",
+            result
+        );
     }
 }
 
@@ -753,21 +857,37 @@ mod remove_unused_variables {
     fn removes_unused_var_declaration() {
         let code = r#"var unused; var used = 1; console.log(used);"#;
         let result = apply_module_to_code(code, Box::new(RemoveUnusedVariables));
-        assert!(!result.contains("var unused"), "expected unused var to be removed; got: {}", result);
-        assert!(result.contains("var used"), "expected used var to remain; got: {}", result);
+        assert!(
+            !result.contains("var unused"),
+            "expected unused var to be removed; got: {}",
+            result
+        );
+        assert!(
+            result.contains("var used"),
+            "expected used var to remain; got: {}",
+            result
+        );
     }
 
     #[test]
     fn removes_dead_literal_assignment() {
         let code = r#"function f() { var x; x = "dead"; return 1; } f();"#;
         let result = apply_module_to_code(code, Box::new(RemoveUnusedVariables));
-        assert!(!result.contains("x = \"dead\""), "expected dead assignment to be removed; got: {}", result);
+        assert!(
+            !result.contains("x = \"dead\""),
+            "expected dead assignment to be removed; got: {}",
+            result
+        );
     }
 
     #[test]
     fn keeps_used_var() {
         let code = r#"function f() { var x = 1; return x; } f();"#;
         let result = apply_module_to_code(code, Box::new(RemoveUnusedVariables));
-        assert!(result.contains("var x"), "expected used var to remain; got: {}", result);
+        assert!(
+            result.contains("var x"),
+            "expected used var to remain; got: {}",
+            result
+        );
     }
 }

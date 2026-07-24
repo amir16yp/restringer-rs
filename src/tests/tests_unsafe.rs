@@ -392,7 +392,8 @@ mod resolve_injected_prototype_method_calls {
     #[test]
     fn resolves_prototype_assignment_inside_nested_function() {
         let code = r#"(function () { function setup() { String.prototype.rot13 = function () { return "rot13-result"; }; } var secret = "abc"; setup(); console.log(secret.rot13()); })();"#;
-        let result = apply_module_to_code(code, Box::new(ResolveInjectedPrototypeMethodCalls::new()));
+        let result =
+            apply_module_to_code(code, Box::new(ResolveInjectedPrototypeMethodCalls::new()));
         assert!(
             result.contains("\"rot13-result\""),
             "expected prototype method call to be resolved; got: {}",

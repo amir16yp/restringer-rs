@@ -184,7 +184,8 @@ impl<'a> Visit<'a> for PrototypeCollector<'a> {
     }
 
     fn visit_function_body(&mut self, it: &FunctionBody<'a>) {
-        self.context_stack.push(build_context(self.source_text, &it.statements));
+        self.context_stack
+            .push(build_context(self.source_text, &it.statements));
         oxc_ast_visit::walk::walk_function_body(self, it);
         self.context_stack.pop();
     }

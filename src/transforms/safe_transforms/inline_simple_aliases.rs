@@ -242,9 +242,10 @@ impl<'a, 'b> AliasInliner<'a, 'b> {
                     if any_removed {
                         let mut new_decl = (*var_decl).clone_in(self.allocator);
                         new_decl.declarations = kept;
-                        new_body.push(Statement::VariableDeclaration(
-                            oxc_allocator::Box::new_in(new_decl, self.allocator),
-                        ));
+                        new_body.push(Statement::VariableDeclaration(oxc_allocator::Box::new_in(
+                            new_decl,
+                            self.allocator,
+                        )));
                     } else {
                         new_body.push(Statement::VariableDeclaration(var_decl));
                     }

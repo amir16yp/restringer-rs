@@ -54,9 +54,15 @@ fn known_value(expr: &Expression<'_>) -> Option<KnownValue> {
         Expression::NullLiteral(_) => Some(KnownValue::Null),
         Expression::NumericLiteral(lit) => Some(KnownValue::Number(lit.value)),
         Expression::StringLiteral(lit) => Some(KnownValue::String(lit.value.to_string())),
-        Expression::Identifier(ident) if ident.name.as_str() == "undefined" => Some(KnownValue::Undefined),
-        Expression::ArrayExpression(_) | Expression::ObjectExpression(_) | Expression::RegExpLiteral(_) => Some(KnownValue::Truthy),
-        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_) => Some(KnownValue::Truthy),
+        Expression::Identifier(ident) if ident.name.as_str() == "undefined" => {
+            Some(KnownValue::Undefined)
+        }
+        Expression::ArrayExpression(_)
+        | Expression::ObjectExpression(_)
+        | Expression::RegExpLiteral(_) => Some(KnownValue::Truthy),
+        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_) => {
+            Some(KnownValue::Truthy)
+        }
         _ => None,
     }
 }
@@ -95,6 +101,19 @@ impl<'a> Visitor<'a> {
         }
     }
 
+    fn assign(&mut self, name: &str, value: Option<KnownValue>) {
+        for scope in self.known.iter_mut().rev() {
+            if scope.contains_key(name) {
+                if let Some(value) = value {
+                    scope.insert(name.to_string(), value);
+                } else {
+                    scope.remove(name);
+                }
+                return;
+            }
+        }
+    }
+
     fn collect_declarations(&mut self, stmts: &[Statement<'_>]) {
         for stmt in stmts {
             if let Statement::VariableDeclaration(decl) = stmt {
@@ -124,8 +143,12 @@ impl<'a> Visitor<'a> {
                 let s = raw.as_str();
                 Some(s != "0" && s != "0n")
             }
-            Expression::RegExpLiteral(_) | Expression::ArrayExpression(_) | Expression::ObjectExpression(_) => Some(true),
-            Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_) => Some(true),
+            Expression::RegExpLiteral(_)
+            | Expression::ArrayExpression(_)
+            | Expression::ObjectExpression(_) => Some(true),
+            Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_) => {
+                Some(true)
+            }
             Expression::Identifier(ident) => {
                 if ident.name.as_str() == "undefined" {
                     Some(false)
@@ -143,7 +166,9 @@ impl<'a> Visitor<'a> {
         if !matches!(expr, Expression::LogicalExpression(_)) {
             return;
         }
-        let Expression::LogicalExpression(logical) = expr else { return; };
+        let Expression::LogicalExpression(logical) = expr else {
+            return;
+        };
 
         let left_truthy = self.truthiness(&logical.left);
         let right_truthy = self.truthiness(&logical.right);
@@ -208,11 +233,6 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
 
     fn visit_function(&mut self, it: &mut Function<'a>, flags: oxc_syntax::scope::ScopeFlags) {
         self.push_scope();
-        for param in &it.params.items {
-            if let Some(name) = binding_pattern_name(&param.pattern) {
-                self.bind(name, KnownValue::Truthy);
-            }
-        }
         oxc_ast_visit::walk_mut::walk_function(self, it, flags);
         self.pop_scope();
     }
@@ -224,11 +244,6 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
 
     fn visit_arrow_function_expression(&mut self, it: &mut ArrowFunctionExpression<'a>) {
         self.push_scope();
-        for param in &it.params.items {
-            if let Some(name) = binding_pattern_name(&param.pattern) {
-                self.bind(name, KnownValue::Truthy);
-            }
-        }
         oxc_ast_visit::walk_mut::walk_arrow_function_expression(self, it);
         self.pop_scope();
     }
@@ -242,9 +257,19 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     fn visit_assignment_expression(&mut self, it: &mut AssignmentExpression<'a>) {
         oxc_ast_visit::walk_mut::walk_assignment_expression(self, it);
         if let AssignmentTarget::AssignmentTargetIdentifier(id) = &it.left {
-            if let Some(v) = known_value(&it.right) {
-                self.bind(id.name.to_string(), v);
-            }
+            let value = if it.operator == AssignmentOperator::Assign {
+                known_value(&it.right)
+            } else {
+                None
+            };
+            self.assign(id.name.as_str(), value);
+        }
+    }
+
+    fn visit_update_expression(&mut self, it: &mut UpdateExpression<'a>) {
+        oxc_ast_visit::walk_mut::walk_update_expression(self, it);
+        if let SimpleAssignmentTarget::AssignmentTargetIdentifier(id) = &it.argument {
+            self.assign(id.name.as_str(), None);
         }
     }
 }

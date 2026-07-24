@@ -62,7 +62,8 @@ impl DenoEngine {
         );
         let output = self.run(&script);
         log_eval_result("eval_to_number", &script, &output);
-        output?.parse::<f64>()
+        output?
+            .parse::<f64>()
             .map_err(|e| format!("Failed to parse Deno number output: {}", e))
     }
 
@@ -73,7 +74,8 @@ impl DenoEngine {
         );
         let output = self.run(&script);
         log_eval_result("eval_to_bool", &script, &output);
-        output?.parse::<bool>()
+        output?
+            .parse::<bool>()
             .map_err(|e| format!("Failed to parse Deno boolean output: {}", e))
     }
 
