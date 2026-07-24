@@ -36,6 +36,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe_transforms::rearrange_switches::RearrangeSwitches),
                 Box::new(transforms::safe_transforms::normalize_empty_statements::NormalizeEmptyStatements),
                 Box::new(transforms::safe_transforms::inline_paired_array_pushes::InlinePairedArrayPushes),
+                Box::new(transforms::safe_transforms::remove_dead_declarations::RemoveDeadDeclarations),
                 Box::new(transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements),
                 Box::new(transforms::safe_transforms::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
                 Box::new(transforms::safe_transforms::unwrap_simple_operations::UnwrapSimpleOperations),
@@ -80,6 +81,9 @@ impl Default for Restringer {
                 Box::new(
                     transforms::safe_transforms::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
                 ),
+                Box::new(
+                    transforms::safe_transforms::replace_void_zero_with_undefined::ReplaceVoidZeroWithUndefined,
+                ),
                 Box::new(transforms::safe_transforms::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
                 Box::new(
                     transforms::safe_transforms::replace_function_shells_with_wrapped_value::ReplaceFunctionShellsWithWrappedValue,
@@ -87,6 +91,7 @@ impl Default for Restringer {
                 Box::new(
                     transforms::safe_transforms::replace_function_shells_with_wrapped_value_iife::ReplaceFunctionShellsWithWrappedValueIIFE,
                 ),
+                Box::new(transforms::safe_transforms::resolve_constructor_literals::ResolveConstructorLiterals),
                 Box::new(transforms::safe_transforms::simplify_calls::SimplifyCalls),
                 Box::new(transforms::safe_transforms::unwrap_function_shells::UnwrapFunctionShells),
                 Box::new(transforms::safe_transforms::unwrap_iifes::UnwrapIIFEs),
@@ -108,6 +113,7 @@ impl Default for Restringer {
                 Box::new(transforms::unsafe_transforms::ResolveDeterministicConditionalExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveInjectedPrototypeMethodCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolveLocalCalls::new()),
+                Box::new(transforms::unsafe_transforms::ResolvePartialLocalCalls),
                 Box::new(transforms::unsafe_transforms::ResolvePackedEvalCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolveEvalCallsOnNonLiterals::new()),
                 Box::new(transforms::unsafe_transforms::EvalConstantExpressions::new()),

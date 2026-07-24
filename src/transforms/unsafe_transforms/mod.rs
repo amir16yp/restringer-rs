@@ -18,6 +18,7 @@ pub mod resolve_local_calls;
 pub mod resolve_member_expressions_local_references;
 pub mod resolve_minimal_alphabet;
 pub mod resolve_packed_eval_calls;
+pub mod resolve_partial_local_calls;
 pub mod unsafe_transform;
 
 pub use engine::{Engine, JsEvaluator, set_default_engine};
@@ -34,4 +35,5 @@ pub use resolve_local_calls::ResolveLocalCalls;
 pub use resolve_member_expressions_local_references::ResolveMemberExpressionsLocalReferences;
 pub use resolve_minimal_alphabet::ResolveMinimalAlphabet;
 pub use resolve_packed_eval_calls::ResolvePackedEvalCalls;
+pub use resolve_partial_local_calls::ResolvePartialLocalCalls;
 pub use unsafe_transform::{UnsafeTransform, UnsafeTransformHelper};

@@ -165,6 +165,37 @@ impl<'a> Visit<'a> for FunctionCollector {
                 }
             }
         }
+        if let Statement::VariableDeclaration(var_decl) = statement {
+            let has_function_init = var_decl.declarations.iter().any(|declarator| {
+                matches!(
+                    declarator.init.as_ref(),
+                    Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
+                )
+            });
+            if has_function_init {
+                let code = helpers::statement_to_code(statement);
+                if code.len() <= 5_000 && !helpers::contains_skip_word(&code) {
+                    for declarator in &var_decl.declarations {
+                        let BindingPattern::BindingIdentifier(id) = &declarator.id else {
+                            continue;
+                        };
+                        if helpers::SKIP_IDENTIFIERS.contains(&id.name.as_str()) {
+                            continue;
+                        }
+                        if matches!(
+                            declarator.init.as_ref(),
+                            Some(
+                                Expression::FunctionExpression(_)
+                                    | Expression::ArrowFunctionExpression(_)
+                            )
+                        ) {
+                            self.names.insert(id.name.to_string());
+                        }
+                    }
+                    self.context_parts.push(code);
+                }
+            }
+        }
         oxc_ast_visit::walk::walk_statement(self, statement);
     }
 }

@@ -5,7 +5,10 @@ use crate::transforms::safe_transforms::normalize_empty_statements::NormalizeEmp
 use crate::transforms::safe_transforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals;
 use crate::transforms::safe_transforms::rearrange_sequences::RearrangeSequences;
 use crate::transforms::safe_transforms::rearrange_switches::RearrangeSwitches;
+use crate::transforms::safe_transforms::remove_dead_declarations::RemoveDeadDeclarations;
 use crate::transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements;
+use crate::transforms::safe_transforms::rename_local_identifiers::RenameLocalIdentifiers;
+use crate::transforms::safe_transforms::replace_void_zero_with_undefined::ReplaceVoidZeroWithUndefined;
 use crate::transforms::safe_transforms::resolve_builtin_string_calls::ResolveBuiltinStringCalls;
 use crate::transforms::safe_transforms::resolve_deterministic_if_statements::ResolveDeterministicIfStatements;
 use crate::transforms::safe_transforms::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions;
@@ -524,6 +527,14 @@ mod resolve_jsfuck_primitives {
             result
         );
     }
+
+    #[test]
+    fn test_not_object_to_false() {
+        let code = "!{}";
+        let expected = "false;\n";
+        let result = apply_module_to_code(code, Box::new(ResolveJSFuckPrimitives));
+        assert_transform("ResolveJSFuckPrimitives", code, expected, &result);
+    }
 }
 
 #[cfg(test)]
@@ -904,6 +915,150 @@ mod resolve_var_string_arrays {
         assert!(
             result.contains(r#"[..."0123456789abcdefghijk"].slice(0, end)"#),
             "expected compact character array to be inlined into slice call; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod replace_void_zero_with_undefined {
+    use super::*;
+    use crate::transforms::safe_transforms::replace_void_zero_with_undefined::ReplaceVoidZeroWithUndefined;
+
+    #[test]
+    fn replaces_void_zero_with_undefined() {
+        let code = "var x = void 0;";
+        let result = apply_module_to_code(code, Box::new(ReplaceVoidZeroWithUndefined));
+        assert!(
+            result.contains("var x = undefined"),
+            "expected void 0 to become undefined; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn replaces_void_parenthesized_zero() {
+        let code = "var x = void(0);";
+        let result = apply_module_to_code(code, Box::new(ReplaceVoidZeroWithUndefined));
+        assert!(
+            result.contains("var x = undefined"),
+            "expected void(0) to become undefined; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn skips_when_undefined_redefined() {
+        let code = "var undefined = 1; var x = void 0;";
+        let result = apply_module_to_code(code, Box::new(ReplaceVoidZeroWithUndefined));
+        assert!(
+            result.contains("void 0"),
+            "expected void 0 to remain when undefined is rebound; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod replace_eval_calls_with_literal_content {
+    use super::*;
+    use crate::transforms::safe_transforms::replace_eval_calls_with_literal_content::ReplaceEvalCallsWithLiteralContent;
+
+    #[test]
+    fn replaces_empty_eval_with_undefined() {
+        let code = "var x = eval('');";
+        let result = apply_module_to_code(code, Box::new(ReplaceEvalCallsWithLiteralContent));
+        assert!(
+            result.contains("var x = undefined"),
+            "expected eval('') to become undefined; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod rename_local_identifiers {
+    use super::*;
+    use crate::transforms::safe_transforms::rename_local_identifiers::RenameLocalIdentifiers;
+
+    #[test]
+    fn renames_obfuscated_function_declaration() {
+        let code = "function _0xabc() { return 1; } console.log(_0xabc());";
+        let result = apply_module_to_code(code, Box::new(RenameLocalIdentifiers));
+        assert!(
+            !result.contains("_0xabc"),
+            "expected _0xabc to be renamed; got: {}",
+            result
+        );
+        assert!(result.contains("function func"), "expected readable function name; got: {}", result);
+    }
+
+    #[test]
+    fn renames_obfuscated_class_declaration() {
+        let code = "class _0xcls { } console.log(new _0xcls());";
+        let result = apply_module_to_code(code, Box::new(RenameLocalIdentifiers));
+        assert!(
+            !result.contains("_0xcls"),
+            "expected _0xcls to be renamed; got: {}",
+            result
+        );
+        assert!(result.contains("class cls"), "expected readable class name; got: {}", result);
+    }
+}
+
+#[cfg(test)]
+mod remove_dead_declarations {
+    use super::*;
+    use crate::transforms::safe_transforms::remove_dead_declarations::RemoveDeadDeclarations;
+
+    #[test]
+    fn removes_unused_local_function_declaration() {
+        let code = r#"{ function _0xabc() { return 1; } } console.log(2);"#;
+        let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
+        assert!(
+            !result.contains("function _0xabc"),
+            "expected dead function to be removed; got: {}",
+            result
+        );
+        assert!(result.contains("console.log(2)"), "expected console.log to remain; got: {}", result);
+    }
+
+    #[test]
+    fn keeps_used_function_declaration() {
+        let code = r#"function _0xabc() { return 1; } console.log(_0xabc());"#;
+        let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
+        assert!(result.contains("function _0xabc"), "expected used function to remain; got: {}", result);
+    }
+
+    #[test]
+    fn keeps_function_used_in_return_statement() {
+        let code = r#"function f() { function helper() { return 1; } return helper(); } f();"#;
+        let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
+        assert!(result.contains("function helper"), "expected helper used in return to remain; got: {}", result);
+    }
+
+    #[test]
+    fn resolves_new_regexp_to_literal() {
+        use crate::transforms::safe_transforms::resolve_constructor_literals::ResolveConstructorLiterals;
+        let code = r#"const re = new RegExp("abc", "g");"#;
+        let result = apply_module_to_code(code, Box::new(ResolveConstructorLiterals));
+        assert!(result.contains("const re = /abc/g"), "expected regex literal; got: {}", result);
+    }
+
+    #[test]
+    fn keeps_root_level_function_declaration() {
+        let code = r#"function _0xabc() { return 1; }"#;
+        let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
+        assert!(result.contains("function _0xabc"), "expected root-level function to remain; got: {}", result);
+    }
+
+    #[test]
+    fn removes_unused_local_class_declaration() {
+        let code = r#"{ class _0xcls {} } console.log(1);"#;
+        let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
+        assert!(
+            !result.contains("class _0xcls"),
+            "expected dead class to be removed; got: {}",
             result
         );
     }

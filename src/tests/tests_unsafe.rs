@@ -292,6 +292,39 @@ mod resolve_local_calls {
     }
 
     #[test]
+    fn resolves_local_function_inside_iife() {
+        let code = r#"
+            (function() {
+                function helper(x) { return x + 1; }
+                const a = helper(2);
+            })();
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert!(result.contains("const a = 3"), "expected helper(2) to resolve to 3; got: {}", result);
+    }
+
+    #[test]
+    fn inlines_partial_local_call() {
+        use crate::transforms::unsafe_transforms::resolve_partial_local_calls::ResolvePartialLocalCalls;
+        let code = r#"
+            function addConstant(x) { return x + (2 * 3); }
+            const y = addConstant(z);
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolvePartialLocalCalls));
+        assert!(result.contains("const y = z + 2 * 3"), "expected partial inline; got: {}", result);
+    }
+
+    #[test]
+    fn resolves_local_calls_to_variable_function_expressions() {
+        let code = r#"
+            var helper = function(x) { return x + 1; };
+            const a = helper(2);
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert!(result.contains("const a = 3"), "expected helper(2) to resolve to 3; got: {}", result);
+    }
+
+    #[test]
     fn resolves_literal_calls_to_nested_mapper_functions() {
         let code = r#"
             if (true) {
@@ -380,6 +413,28 @@ mod resolve_builtin_calls {
         let expected = "const a = \"Hello World\";\nconst b = \"SGVsbG8gV29ybGQ=\";\nconst c = \"Hello%20World\";\n";
         let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
         assert_transform("ResolveBuiltinCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_math_and_object_calls() {
+        let code = r#"
+            const a = Math.max(1, 2);
+            const b = Object.keys({a: 1, b: 2});
+            const c = Array.isArray([]);
+            const d = Number("42");
+            const e = Boolean(0);
+            const f = JSON.stringify({x: 1});
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
+        assert!(!result.contains("Math.max"), "expected Math.max to be resolved; got: {}", result);
+        assert!(!result.contains("Object.keys"), "expected Object.keys to be resolved; got: {}", result);
+        assert!(!result.contains("Array.isArray"), "expected Array.isArray to be resolved; got: {}", result);
+        assert!(!result.contains("Number("), "expected Number to be resolved; got: {}", result);
+        assert!(!result.contains("Boolean("), "expected Boolean to be resolved; got: {}", result);
+        assert!(!result.contains("JSON.stringify"), "expected JSON.stringify to be resolved; got: {}", result);
+        assert!(result.contains("const a = 2"), "expected a = 2; got: {}", result);
+        assert!(result.contains("const c = true"), "expected c = true; got: {}", result);
+        assert!(result.contains("const e = false"), "expected e = false; got: {}", result);
     }
 }
 

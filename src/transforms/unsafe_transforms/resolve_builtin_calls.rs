@@ -18,15 +18,53 @@ impl ResolveBuiltinCalls {
         }
     }
 
-    fn is_builtin_call(&self, call: &CallExpression) -> bool {
-        // Check if all arguments are static literals or regex literals
-        let args_ok = call.arguments.iter().all(|arg| {
-            if let Some(expr) = arg.as_expression() {
-                helpers::is_static_literal(expr) || matches!(expr, Expression::RegExpLiteral(_))
-            } else {
-                false
+    fn is_safe_argument(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::NumericLiteral(_)
+            | Expression::StringLiteral(_)
+            | Expression::BooleanLiteral(_)
+            | Expression::NullLiteral(_)
+            | Expression::BigIntLiteral(_)
+            | Expression::RegExpLiteral(_) => true,
+            Expression::UnaryExpression(un) => {
+                matches!(
+                    un.operator,
+                    oxc_syntax::operator::UnaryOperator::UnaryNegation
+                        | oxc_syntax::operator::UnaryOperator::UnaryPlus
+                ) && self.is_safe_argument(&un.argument)
             }
-        });
+            Expression::ArrayExpression(arr) => arr.elements.iter().all(|elem| match elem {
+                ArrayExpressionElement::SpreadElement(_) => false,
+                ArrayExpressionElement::Elision(_) => true,
+                _ => self.is_safe_argument(elem.to_expression()),
+            }),
+            Expression::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
+                ObjectPropertyKind::ObjectProperty(p) => {
+                    let key_safe = match &p.key {
+                        PropertyKey::StaticIdentifier(_) => true,
+                        PropertyKey::PrivateIdentifier(_) => false,
+                        PropertyKey::NullLiteral(_)
+                        | PropertyKey::NumericLiteral(_)
+                        | PropertyKey::StringLiteral(_)
+                        | PropertyKey::RegExpLiteral(_)
+                        | PropertyKey::BigIntLiteral(_)
+                        | PropertyKey::TemplateLiteral(_) => true,
+                        _ => false,
+                    };
+                    key_safe && self.is_safe_argument(&p.value)
+                }
+                ObjectPropertyKind::SpreadProperty(_) => false,
+            }),
+            Expression::ParenthesizedExpression(p) => self.is_safe_argument(&p.expression),
+            _ => false,
+        }
+    }
+
+    fn is_builtin_call(&self, call: &CallExpression) -> bool {
+        let args_ok = call
+            .arguments
+            .iter()
+            .all(|arg| arg.as_expression().map_or(false, |e| self.is_safe_argument(e)));
 
         if !args_ok {
             return false;
@@ -49,6 +87,9 @@ impl ResolveBuiltinCalls {
                         | "unescape"
                         | "isNaN"
                         | "isFinite"
+                        | "String"
+                        | "Number"
+                        | "Boolean"
                 )
             }
             Expression::StaticMemberExpression(mem) => {
@@ -56,6 +97,62 @@ impl ResolveBuiltinCalls {
                 match &mem.object {
                     Expression::Identifier(id) if id.name.as_str() == "String" => {
                         matches!(prop_name, "fromCharCode" | "fromCodePoint")
+                    }
+                    Expression::Identifier(id) if id.name.as_str() == "Number" => matches!(
+                        prop_name,
+                        "isNaN"
+                            | "isFinite"
+                            | "isInteger"
+                            | "isSafeInteger"
+                            | "parseInt"
+                            | "parseFloat"
+                    ),
+                    Expression::Identifier(id) if id.name.as_str() == "Math" => matches!(
+                        prop_name,
+                        "abs"
+                            | "acos"
+                            | "acosh"
+                            | "asin"
+                            | "asinh"
+                            | "atan"
+                            | "atan2"
+                            | "atanh"
+                            | "cbrt"
+                            | "ceil"
+                            | "clz32"
+                            | "cos"
+                            | "cosh"
+                            | "exp"
+                            | "expm1"
+                            | "floor"
+                            | "fround"
+                            | "hypot"
+                            | "imul"
+                            | "log"
+                            | "log1p"
+                            | "log10"
+                            | "log2"
+                            | "max"
+                            | "min"
+                            | "pow"
+                            | "round"
+                            | "sign"
+                            | "sin"
+                            | "sinh"
+                            | "sqrt"
+                            | "tan"
+                            | "tanh"
+                            | "trunc"
+                    ),
+                    Expression::Identifier(id) if id.name.as_str() == "Object" => matches!(
+                        prop_name,
+                        "keys" | "values" | "entries" | "getOwnPropertyNames" | "getOwnPropertySymbols"
+                    ),
+                    Expression::Identifier(id) if id.name.as_str() == "Array" => {
+                        matches!(prop_name, "isArray" | "from")
+                    }
+                    Expression::Identifier(id) if id.name.as_str() == "JSON" => {
+                        matches!(prop_name, "stringify")
                     }
                     Expression::StringLiteral(_) => {
                         matches!(
@@ -75,12 +172,11 @@ impl ResolveBuiltinCalls {
                         )
                     }
                     Expression::ArrayExpression(arr) => {
-                        let elements_ok = arr.elements.iter().all(|elem| match elem {
+                        arr.elements.iter().all(|elem| match elem {
                             ArrayExpressionElement::SpreadElement(_) => false,
                             ArrayExpressionElement::Elision(_) => true,
-                            _ => helpers::is_static_literal(elem.to_expression()),
-                        });
-                        elements_ok && matches!(prop_name, "join" | "slice" | "concat" | "indexOf")
+                            _ => self.is_safe_argument(elem.to_expression()),
+                        }) && matches!(prop_name, "join" | "slice" | "concat" | "indexOf")
                     }
                     _ => false,
                 }

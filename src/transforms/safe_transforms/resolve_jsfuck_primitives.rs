@@ -47,6 +47,7 @@ impl<'a> Resolver<'a> {
                 self.try_eval_to_bool(&un.argument).map(|v| !v)
             }
             Expression::ArrayExpression(_) => Some(true),
+            Expression::ObjectExpression(_) => Some(true),
             Expression::NumericLiteral(n) => {
                 if n.value == 0.0 || n.value.is_nan() {
                     Some(false)

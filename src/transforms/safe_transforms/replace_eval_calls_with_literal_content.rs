@@ -63,6 +63,19 @@ impl<'a> Visitor<'a> {
         }
     }
 
+    fn make_undefined(&self, span: oxc_span::Span) -> Expression<'a> {
+        let name = self.allocator.alloc_str("undefined");
+        Expression::Identifier(ArenaBox::new_in(
+            IdentifierReference {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                name: name.into(),
+                reference_id: None.into(),
+            },
+            self.allocator,
+        ))
+    }
+
     fn parse_eval_argument(&self, span: oxc_span::Span, code: &str) -> Option<Replacement<'a>> {
         // Parse into temporary arena so we don't grow the main arena on failed parses.
         let temp_allocator = Allocator::default();
@@ -78,7 +91,8 @@ impl<'a> Visitor<'a> {
 
         let body = &parse_ret.program.body;
         if body.is_empty() {
-            return None;
+            // eval(""), eval(";"), etc. always return undefined.
+            return Some(Replacement::Expr(self.make_undefined(span)));
         }
 
         if body.len() > 1 {

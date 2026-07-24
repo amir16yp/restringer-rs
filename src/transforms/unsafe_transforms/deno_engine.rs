@@ -1,4 +1,5 @@
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 use super::engine::is_eval_verbose;
 
@@ -31,10 +32,24 @@ pub struct DenoEngine;
 
 impl DenoEngine {
     fn run(&self, script: &str) -> Result<String, String> {
-        let output = Command::new("deno")
-            .args(["eval", "--ext=js", script])
-            .output()
+        let mut child = Command::new("deno")
+            .args(["run", "--ext=js", "-"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| format!("Failed to spawn Deno process: {}", e))?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            let script = script.to_string();
+            std::thread::spawn(move || {
+                let _ = stdin.write_all(script.as_bytes());
+            });
+        }
+
+        let output = child
+            .wait_with_output()
+            .map_err(|e| format!("Failed to read Deno output: {}", e))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

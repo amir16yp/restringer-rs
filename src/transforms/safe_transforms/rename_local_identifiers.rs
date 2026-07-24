@@ -20,6 +20,7 @@ impl Transform for RenameLocalIdentifiers {
             allocator: ctx.allocator,
             modified: false,
             stack: Vec::new(),
+            used: HashSet::new(),
         };
         v.visit_program(program);
         v.modified
@@ -30,6 +31,7 @@ struct RenameVisitor<'a> {
     allocator: &'a Allocator,
     modified: bool,
     stack: Vec<Scope>,
+    used: HashSet<String>,
 }
 
 struct Scope {
@@ -50,31 +52,63 @@ impl<'a> RenameVisitor<'a> {
             }
         }
     }
+
+    fn add_param_rename(
+        &mut self,
+        pat: &BindingPattern<'_>,
+        base: &str,
+        renames: &mut HashMap<String, String>,
+    ) {
+        if let BindingPattern::BindingIdentifier(id) = pat {
+            let old = id.name.as_str();
+            if looks_obfuscated(old) && !renames.contains_key(old) {
+                let new = make_unique(base, &mut self.used);
+                self.used.insert(new.clone());
+                renames.insert(old.to_string(), new);
+            }
+        }
+    }
 }
 
 impl<'a> VisitMut<'a> for RenameVisitor<'a> {
     fn visit_program(&mut self, it: &mut Program<'a>) {
-        let renames = collect_renames_for_scope(&it.body, false);
+        let renames = collect_renames_for_scope(&it.body, &mut self.used, false);
         self.stack.push(Scope { renames });
         oxc_ast_visit::walk_mut::walk_program(self, it);
         self.stack.pop();
     }
 
     fn visit_function(&mut self, it: &mut Function<'a>, flags: ScopeFlags) {
-        let renames = if let Some(body) = &it.body {
-            collect_renames_for_scope(&body.statements, true)
+        let mut renames = if let Some(body) = &it.body {
+            collect_renames_for_scope(&body.statements, &mut self.used, true)
         } else {
             HashMap::new()
         };
+        for param in &it.params.items {
+            self.add_param_rename(&param.pattern, "arg", &mut renames);
+        }
         self.stack.push(Scope { renames });
         oxc_ast_visit::walk_mut::walk_function(self, it, flags);
         self.stack.pop();
     }
 
     fn visit_arrow_function_expression(&mut self, it: &mut ArrowFunctionExpression<'a>) {
-        let renames = collect_renames_for_scope(&it.body.statements, true);
+        let mut renames = collect_renames_for_scope(&it.body.statements, &mut self.used, true);
+        for param in &it.params.items {
+            self.add_param_rename(&param.pattern, "arg", &mut renames);
+        }
         self.stack.push(Scope { renames });
         oxc_ast_visit::walk_mut::walk_arrow_function_expression(self, it);
+        self.stack.pop();
+    }
+
+    fn visit_catch_clause(&mut self, it: &mut CatchClause<'a>) {
+        let mut renames = HashMap::new();
+        if let Some(param) = &it.param {
+            self.add_param_rename(&param.pattern, "err", &mut renames);
+        }
+        self.stack.push(Scope { renames });
+        oxc_ast_visit::walk_mut::walk_catch_clause(self, it);
         self.stack.pop();
     }
 
@@ -89,6 +123,7 @@ impl<'a> VisitMut<'a> for RenameVisitor<'a> {
 
 fn collect_renames_for_scope<'a>(
     stmts: &[Statement<'a>],
+    used: &mut HashSet<String>,
     _is_function_scope: bool,
 ) -> HashMap<String, String> {
     let mut declared: HashSet<String> = HashSet::new();
@@ -96,6 +131,9 @@ fn collect_renames_for_scope<'a>(
 
     for stmt in stmts {
         collect_declared_names(stmt, &mut declared);
+    }
+    for d in &declared {
+        used.insert(d.clone());
     }
 
     let mut push_pairs: Vec<(String, String)> = Vec::new();
@@ -125,18 +163,43 @@ fn collect_renames_for_scope<'a>(
                 }
             }
         }
+        if let Statement::FunctionDeclaration(func) = stmt {
+            if let Some(id) = &func.id {
+                let old_name = id.name.as_str();
+                if looks_obfuscated(old_name) {
+                    candidates.push((old_name.to_string(), "func".to_string()));
+                }
+            }
+        }
+        if let Statement::ClassDeclaration(class) = stmt {
+            if let Some(id) = &class.id {
+                let old_name = id.name.as_str();
+                if looks_obfuscated(old_name) {
+                    candidates.push((old_name.to_string(), "cls".to_string()));
+                }
+            }
+        }
     }
 
     let mut renames: HashMap<String, String> = HashMap::new();
-    let mut used: HashSet<String> = declared.clone();
 
-    for (old, mut new) in candidates {
+    for (old, new) in candidates {
         if renames.contains_key(&old) || !looks_obfuscated(&old) {
             continue;
         }
-        new = make_unique(&new, &used);
-        used.insert(new.clone());
-        renames.insert(old, new);
+        let unique = make_unique(&new, used);
+        used.insert(unique.clone());
+        renames.insert(old, unique);
+    }
+
+    // Rename any remaining obfuscated local identifiers to generic names.
+    for old in &declared {
+        if renames.contains_key(old) || !looks_obfuscated(old) {
+            continue;
+        }
+        let unique = make_unique("v", used);
+        used.insert(unique.clone());
+        renames.insert(old.clone(), unique);
     }
 
     renames
@@ -148,7 +211,7 @@ fn make_unique(base: &str, used: &HashSet<String>) -> String {
     }
     let mut n = 2usize;
     loop {
-        let candidate = format!("{}{}", base, n);
+        let candidate = format!("{}_{}", base, n);
         if !used.contains(&candidate) {
             return candidate;
         }
