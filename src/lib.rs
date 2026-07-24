@@ -1,7 +1,7 @@
 use std::{path::PathBuf, time::{Duration, Instant}};
 
 use oxc_allocator::Allocator;
-use oxc_codegen::{Codegen, CodegenOptions, CodegenReturn};
+use oxc_codegen::{Codegen, CodegenOptions, CodegenReturn, CommentOptions, IndentChar};
 use oxc_parser::{ParseOptions, Parser};
 use oxc_span::SourceType;
 
@@ -42,6 +42,12 @@ impl Default for Restringer {
                     transforms::safe_transforms::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
                 ),
                 Box::new(
+                    transforms::safe_transforms::resolve_var_string_arrays::ResolveVarStringArrays,
+                ),
+                Box::new(
+                    transforms::safe_transforms::remove_resolved_var_string_arrays::RemoveResolvedVarStringArrays,
+                ),
+                Box::new(
                     transforms::safe_transforms::resolve_member_expressions_with_direct_assignment::ResolveMemberExpressionsWithDirectAssignment,
                 ),
                 Box::new(
@@ -79,6 +85,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe_transforms::unwrap_function_shells::UnwrapFunctionShells),
                 Box::new(transforms::safe_transforms::unwrap_iifes::UnwrapIIFEs),
                 Box::new(transforms::safe_transforms::simplify_if_statements::SimplifyIfStatements),
+                Box::new(transforms::safe_transforms::rename_local_identifiers::RenameLocalIdentifiers),
                 // Additional Rust-specific transforms kept after the JS-equivalent pipeline.
                 Box::new(transforms::safe_transforms::resolve_jsfuck_primitives::ResolveJSFuckPrimitives),
                 Box::new(transforms::safe_transforms::unwrap_parentheses::UnwrapParentheses),
@@ -97,6 +104,7 @@ impl Default for Restringer {
                 Box::new(transforms::unsafe_transforms::ResolveLocalCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolveEvalCallsOnNonLiterals::new()),
                 Box::new(transforms::unsafe_transforms::EvalConstantExpressions::new()),
+                Box::new(transforms::unsafe_transforms::ResolveLiteralIifeResults::new()),
             ],
         }
     }
@@ -172,6 +180,24 @@ impl Restringer {
 
     pub fn max_iterations(&self) -> usize {
         self.max_iterations
+    }
+
+    pub fn set_indent_spaces(&mut self, width: usize) {
+        self.codegen_options.indent_char = IndentChar::Space;
+        self.codegen_options.indent_width = width;
+    }
+
+    pub fn set_single_quote(&mut self, single_quote: bool) {
+        self.codegen_options.single_quote = single_quote;
+    }
+
+    pub fn set_print_comments(&mut self, print_comments: bool) {
+        self.codegen_options.comments = CommentOptions {
+            normal: print_comments,
+            jsdoc: print_comments,
+            annotation: print_comments,
+            legal: if print_comments { oxc_codegen::LegalComment::Inline } else { oxc_codegen::LegalComment::None },
+        };
     }
 
     pub fn apply_modules_to_code(

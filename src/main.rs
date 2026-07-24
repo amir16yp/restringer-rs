@@ -56,6 +56,18 @@ struct Cli {
     /// Unsafe transform engine to use: deno or quickjs (default: deno)
     #[arg(long = "unsafe-engine", default_value = "deno")]
     unsafe_engine: String,
+
+    /// Number of spaces to use per indentation level instead of tabs (default: disabled, use tabs)
+    #[arg(long = "indent-spaces", num_args = 0..=1, default_missing_value = "2")]
+    indent_spaces: Option<usize>,
+
+    /// Use single quotes instead of double quotes in generated output
+    #[arg(long = "single-quote")]
+    single_quote: bool,
+
+    /// Do not print comments in generated output
+    #[arg(long = "no-comments")]
+    no_comments: bool,
 }
 
 fn main() {
@@ -117,6 +129,15 @@ fn main() {
     let mut restringer = Restringer::default();
     if let Some(m) = cli.max_iterations {
         restringer.set_max_iterations(m);
+    }
+    if let Some(width) = cli.indent_spaces {
+        restringer.set_indent_spaces(width);
+    }
+    if cli.single_quote {
+        restringer.set_single_quote(true);
+    }
+    if cli.no_comments {
+        restringer.set_print_comments(false);
     }
     let result = match restringer.deobfuscate(
         &source_text,

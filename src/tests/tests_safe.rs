@@ -374,20 +374,6 @@ mod rearrange_switches {
         assert_transform("RearrangeSwitches", code, expected, &result);
     }
 }
-//
-// #[cfg(test)]
-// mod remove_dead_nodes {
-//     use super::*;
-//
-//     #[test]
-//     fn tp_1() {
-//         let code = "var a = 3, b = 12; console.log(b);";
-//         let expected = "var b = 12;\nconsole.log(b);\n";
-//         let result = apply_module_to_code(code, Box::new(RemoveDeadNodes));
-//         assert_transform("RemoveDeadNodes", code, expected, &result);
-//     }
-// }
-
 // Note: The JavaScript reference file contains many more test modules.
 // Due to the extensive length, I'm providing a representative sample.
 // The pattern should be continued for all remaining modules following the same structure.
