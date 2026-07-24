@@ -111,6 +111,8 @@ impl Default for Restringer {
                 Box::new(transforms::unsafe_transforms::ResolveDefiniteMemberExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveBuiltinCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolveDeterministicConditionalExpressions::new()),
+                Box::new(transforms::unsafe_transforms::ResolveFunctionToArray::new()),
+                Box::new(transforms::unsafe_transforms::NormalizeRedundantNotOperator::new()),
                 Box::new(transforms::unsafe_transforms::ResolveInjectedPrototypeMethodCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolveLocalCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolvePartialLocalCalls),

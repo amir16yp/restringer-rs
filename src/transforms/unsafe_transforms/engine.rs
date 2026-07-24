@@ -47,6 +47,48 @@ pub fn is_eval_verbose() -> bool {
     VERBOSE.load(Ordering::Relaxed)
 }
 
+pub fn log_eval_result(engine: &str, op: &str, code: &str, output: &Result<String, String>) {
+    if !is_eval_verbose() {
+        return;
+    }
+    let code_len = code.len();
+    match output {
+        Ok(out) => {
+            let out_len = out.len();
+            let delta = out_len as i64 - code_len as i64;
+            let sign = if delta >= 0 { "+" } else { "" };
+            eprintln!(
+                "[verbose] {} {}: {} -> {} chars (Δ {}{})",
+                engine, op, code_len, out_len, sign, delta
+            );
+            eprintln!("  code:   {}", preview(code, 120));
+            eprintln!("  result: {}", preview(out, 120));
+        }
+        Err(err) => {
+            let err_summary = err.lines().next().unwrap_or(err).to_string();
+            // Expected runtime failures (ReferenceError, TypeError, etc.) are
+            // surfaced to the caller as Err; don't spam verbose logs with them.
+            // Only log genuine infrastructure/unexpected errors.
+            if !err_summary.starts_with("Deno eval failed:") {
+                eprintln!(
+                    "[verbose] {} {} failed: code {} chars: {}",
+                    engine, op, code_len, err_summary
+                );
+            }
+        }
+    }
+}
+
+pub fn preview(s: &str, max_chars: usize) -> String {
+    let mut out: String = s.chars().take(max_chars).collect();
+    if s.chars().count() > max_chars {
+        out.push_str("...");
+    }
+    out.replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
 impl Engine {
     fn to_u8(self) -> u8 {
         match self {

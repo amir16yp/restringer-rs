@@ -1,5 +1,7 @@
 use crate::transforms::unsafe_transforms::eval_constant_expressions::EvalConstantExpressions;
 use crate::transforms::unsafe_transforms::js_runtime::JsEvaluator;
+use crate::transforms::unsafe_transforms::normalize_redundant_not_operator::NormalizeRedundantNotOperator;
+use crate::transforms::unsafe_transforms::resolve_function_to_array::ResolveFunctionToArray;
 use crate::transforms::unsafe_transforms::resolve_injected_prototype_method_calls::ResolveInjectedPrototypeMethodCalls;
 use crate::transforms::unsafe_transforms::resolve_literal_iife_results::ResolveLiteralIifeResults;
 use crate::transforms::unsafe_transforms::resolve_packed_eval_calls::ResolvePackedEvalCalls;
@@ -631,6 +633,89 @@ mod resolve_injected_prototype_method_calls {
         assert!(
             result.contains("\"rot13-result\""),
             "expected prototype method call to be resolved; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod normalize_redundant_not_operator {
+    use super::*;
+
+    #[test]
+    fn resolves_not_on_literal() {
+        let code = "const a = !true; const b = !0; const c = !'';";
+        let expected = "const a = false;\nconst b = true;\nconst c = true;\n";
+        let result = apply_module_to_code(code, Box::new(NormalizeRedundantNotOperator::new()));
+        assert_transform("NormalizeRedundantNotOperator", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_not_on_array_and_object() {
+        let code = "const a = ![]; const b = !{};";
+        let expected = "const a = false;\nconst b = false;\n";
+        let result = apply_module_to_code(code, Box::new(NormalizeRedundantNotOperator::new()));
+        assert_transform("NormalizeRedundantNotOperator", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_nested_not() {
+        let code = "const a = !!true; const b = !!!false;";
+        let expected = "const a = true;\nconst b = true;\n";
+        let result = apply_module_to_code(code, Box::new(NormalizeRedundantNotOperator::new()));
+        assert_transform("NormalizeRedundantNotOperator", code, expected, &result);
+    }
+
+    #[test]
+    fn skips_not_on_unknown_identifier() {
+        let code = "const a = !unknownVar;";
+        let result = apply_module_to_code(code, Box::new(NormalizeRedundantNotOperator::new()));
+        assert!(
+            result.contains("!unknownVar"),
+            "expected unknown identifier to stay unevaluated; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod resolve_function_to_array {
+    use super::*;
+
+    #[test]
+    fn resolves_function_call_returning_array() {
+        let code = "function getArr() { return ['a', 'b']; }\nvar data = getArr();\nconsole.log(data[0], data[1]);";
+        let expected = "function getArr() {\n\treturn [\"a\", \"b\"];\n}\nvar data = [\"a\", \"b\"];\nconsole.log(data[0], data[1]);\n";
+        let result = apply_module_to_code(code, Box::new(ResolveFunctionToArray::new()));
+        assert_transform("ResolveFunctionToArray", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_arrow_function_returning_array() {
+        let code = "var getArr = () => ['x', 'y'];\nvar data = getArr();\nconsole.log(data[0]);";
+        let expected = "var getArr = () => [\"x\", \"y\"];\nvar data = [\"x\", \"y\"];\nconsole.log(data[0]);\n";
+        let result = apply_module_to_code(code, Box::new(ResolveFunctionToArray::new()));
+        assert_transform("ResolveFunctionToArray", code, expected, &result);
+    }
+
+    #[test]
+    fn skips_when_variable_used_as_callee() {
+        let code = "function getArr() { return ['a']; }\nvar data = getArr();\ndata();";
+        let result = apply_module_to_code(code, Box::new(ResolveFunctionToArray::new()));
+        assert!(
+            result.contains("var data = getArr()"),
+            "expected call to stay when variable used as callee; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn skips_when_function_mutates_self() {
+        let code = "function getArr() { getArr = 1; return ['a']; }\nvar data = getArr();\nconsole.log(data[0]);";
+        let result = apply_module_to_code(code, Box::new(ResolveFunctionToArray::new()));
+        assert!(
+            result.contains("var data = getArr()"),
+            "expected call to stay when function mutates its binding; got: {}",
             result
         );
     }

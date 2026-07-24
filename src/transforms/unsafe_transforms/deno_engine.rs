@@ -1,38 +1,7 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use super::engine::is_eval_verbose;
-
-fn log_eval_result(op: &str, input: &str, output: &Result<String, String>) {
-    if !is_eval_verbose() {
-        return;
-    }
-    let input_len = input.len();
-    match output {
-        Ok(out) => {
-            let out_len = out.len();
-            let delta = out_len as i64 - input_len as i64;
-            let sign = if delta >= 0 { "+" } else { "" };
-            let input_preview: String = input.chars().take(120).collect();
-            eprintln!(
-                "[verbose] deno {}: {} -> {} chars (Δ {}{}), input {:?}, newchars {}",
-                op, input_len, out_len, sign, delta, input_preview, out
-            );
-        }
-        Err(err) => {
-            let err_summary = err.lines().next().unwrap_or(err).to_string();
-            // Expected runtime failures (ReferenceError, TypeError, etc.) are
-            // surfaced to the caller as Err; don't spam verbose logs with them.
-            // Only log genuine infrastructure/unexpected errors.
-            if !err_summary.starts_with("Deno eval failed:") {
-                eprintln!(
-                    "[verbose] deno {} failed: input {} chars: {}",
-                    op, input_len, err_summary
-                );
-            }
-        }
-    }
-}
+use super::engine::log_eval_result;
 
 pub struct DenoEngine;
 
@@ -74,7 +43,7 @@ impl DenoEngine {
             escape_js_string(code)
         );
         let result = self.run(&script);
-        log_eval_result("eval_to_string", &script, &result);
+        log_eval_result("deno", "eval_to_string", code, &result);
         result
     }
 
@@ -84,7 +53,7 @@ impl DenoEngine {
             escape_js_string(code)
         );
         let output = self.run(&script);
-        log_eval_result("eval_to_number", &script, &output);
+        log_eval_result("deno", "eval_to_number", code, &output);
         output?
             .parse::<f64>()
             .map_err(|e| format!("Failed to parse Deno number output: {}", e))
@@ -96,7 +65,7 @@ impl DenoEngine {
             escape_js_string(code)
         );
         let output = self.run(&script);
-        log_eval_result("eval_to_bool", &script, &output);
+        log_eval_result("deno", "eval_to_bool", code, &output);
         output?
             .parse::<bool>()
             .map_err(|e| format!("Failed to parse Deno boolean output: {}", e))
@@ -120,7 +89,7 @@ impl DenoEngine {
             escape_js_string(code)
         );
         let output = self.run(&script);
-        log_eval_result("eval_to_json", &script, &output);
+        log_eval_result("deno", "eval_to_json", code, &output);
         let output = output?;
         if output.is_empty() {
             return Err("Deno produced empty output".to_string());
