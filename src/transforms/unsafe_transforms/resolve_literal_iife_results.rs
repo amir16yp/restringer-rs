@@ -1,4 +1,5 @@
 use oxc_ast::ast::*;
+use oxc_ast_visit::VisitMut;
 use oxc_span::GetSpan;
 
 use super::helpers;
@@ -30,40 +31,46 @@ impl Transform for ResolveLiteralIifeResults {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut modified = false;
-
-        for stmt in program.body.iter_mut() {
-            let mut replacement: Option<Expression<'a>> = None;
-
-            if let Statement::VariableDeclaration(decl) = stmt {
-                for d in &mut decl.declarations {
-                    let Some(init) = &d.init else { continue };
-                    if is_literal_iife(init) {
-                        let code = helpers::expression_to_code(init);
-                        if let Ok(json) = self.evaluator.eval_to_json(&code) {
-                            if let Some(expr) =
-                                helpers::parse_expression_in(ctx.allocator, &json, init.span())
-                            {
-                                replacement = Some(expr);
-                            }
-                        }
-                    }
-                    if replacement.is_some() {
-                        d.init = replacement;
-                        modified = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        modified
+        let mut visitor = Visitor {
+            allocator: ctx.allocator,
+            transform: self,
+            modified: false,
+        };
+        visitor.visit_program(program);
+        visitor.modified
     }
 }
 
 impl UnsafeTransform for ResolveLiteralIifeResults {
     fn evaluator(&self) -> &JsEvaluator {
         &self.evaluator
+    }
+}
+
+struct Visitor<'a, 'b> {
+    allocator: &'a oxc_allocator::Allocator,
+    transform: &'b ResolveLiteralIifeResults,
+    modified: bool,
+}
+
+impl<'a, 'b> VisitMut<'a> for Visitor<'a, 'b> {
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        oxc_ast_visit::walk_mut::walk_expression(self, expression);
+        if !is_literal_iife(expression) {
+            return;
+        }
+        let code = helpers::expression_to_code(expression);
+        let full_code = format!("{};\n{}", helpers::EVAL_PRELUDE, code);
+        let Ok(json) = self.transform.evaluator.eval_to_json(&full_code) else {
+            return;
+        };
+        let Some(replacement) =
+            helpers::parse_expression_in(self.allocator, &json, expression.span())
+        else {
+            return;
+        };
+        *expression = replacement;
+        self.modified = true;
     }
 }
 

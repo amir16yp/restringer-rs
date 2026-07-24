@@ -1,5 +1,5 @@
 use oxc_ast::ast::*;
-use oxc_ast_visit::VisitMut;
+use oxc_ast_visit::{Visit, VisitMut};
 use oxc_span::GetSpan;
 use std::collections::HashSet;
 
@@ -33,8 +33,13 @@ impl Transform for ResolveLocalCalls {
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
         // Step 1: Collect top-level statements that define our environment context.
-        let mut context_parts = Vec::new();
-        let mut local_function_names = HashSet::new();
+        let mut function_collector = FunctionCollector {
+            context_parts: Vec::new(),
+            names: HashSet::new(),
+        };
+        function_collector.visit_program(&*program);
+        let mut context_parts = function_collector.context_parts;
+        let mut local_function_names = function_collector.names;
 
         for stmt in &program.body {
             let code = helpers::statement_to_code(stmt);
@@ -43,15 +48,7 @@ impl Transform for ResolveLocalCalls {
             }
 
             match stmt {
-                Statement::FunctionDeclaration(func) => {
-                    if let Some(id) = &func.id {
-                        let name = id.name.to_string();
-                        if !helpers::SKIP_IDENTIFIERS.contains(&name.as_str()) {
-                            local_function_names.insert(name);
-                            context_parts.push(code);
-                        }
-                    }
-                }
+                Statement::FunctionDeclaration(_) => {}
                 Statement::VariableDeclaration(decl) => {
                     let mut has_skip = false;
                     for d in &decl.declarations {
@@ -114,6 +111,30 @@ impl Transform for ResolveLocalCalls {
 impl UnsafeTransform for ResolveLocalCalls {
     fn evaluator(&self) -> &JsEvaluator {
         &self.evaluator
+    }
+}
+
+struct FunctionCollector {
+    context_parts: Vec<String>,
+    names: HashSet<String>,
+}
+
+impl<'a> Visit<'a> for FunctionCollector {
+    fn visit_statement(&mut self, statement: &Statement<'a>) {
+        if let Statement::FunctionDeclaration(function) = statement {
+            if let Some(id) = &function.id {
+                let code = helpers::statement_to_code(statement);
+                let name = id.name.to_string();
+                if code.len() <= 5_000
+                    && !helpers::contains_skip_word(&code)
+                    && !helpers::SKIP_IDENTIFIERS.contains(&name.as_str())
+                {
+                    self.names.insert(name);
+                    self.context_parts.push(code);
+                }
+            }
+        }
+        oxc_ast_visit::walk::walk_statement(self, statement);
     }
 }
 

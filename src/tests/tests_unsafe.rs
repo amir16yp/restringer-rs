@@ -1,5 +1,6 @@
 use crate::transforms::unsafe_transforms::eval_constant_expressions::EvalConstantExpressions;
 use crate::transforms::unsafe_transforms::js_runtime::JsEvaluator;
+use crate::transforms::unsafe_transforms::resolve_literal_iife_results::ResolveLiteralIifeResults;
 use crate::transforms::unsafe_transforms::resolve_packed_eval_calls::ResolvePackedEvalCalls;
 use crate::{DeobfuscateOptions, Restringer};
 
@@ -23,6 +24,20 @@ fn assert_transform(transform_name: &str, input: &str, expected: &str, actual: &
     println!("### Expected\n```javascript\n{}\n```\n", expected);
     println!("### Actual\n```javascript\n{}\n```\n", actual);
     assert_eq!(actual, expected);
+}
+
+#[cfg(test)]
+mod resolve_literal_iife_results {
+    use super::*;
+
+    #[test]
+    fn resolves_nested_literal_iife_without_removing_its_scope() {
+        let code =
+            r#"if (ready) { const value = (function(value) { return btoa(value); })("A"); }"#;
+        let expected = "if (ready) {\n\tconst value = \"QQ==\";\n}\n";
+        let result = apply_module_to_code(code, Box::new(ResolveLiteralIifeResults::new()));
+        assert_transform("ResolveLiteralIifeResults", code, expected, &result);
+    }
 }
 
 #[cfg(test)]
@@ -238,6 +253,39 @@ mod resolve_local_calls {
         let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
         assert_transform("ResolveLocalCalls", code, expected, &result);
     }
+
+    #[test]
+    fn resolves_literal_calls_to_nested_mapper_functions() {
+        let code = r#"
+            if (true) {
+                function mapper(value) {
+                    return btoa(value).replace(new RegExp("Q", "g"), ".Y");
+                }
+                const result = mapper("A");
+            }
+        "#;
+        let expected = "if (true) {\n\tfunction mapper(value) {\n\t\treturn btoa(value).replace(new RegExp(\"Q\", \"g\"), \".Y\");\n\t}\n\tconst result = \".Y.Y==\";\n}\n";
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert_transform("ResolveLocalCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_literal_calls_to_base64_map_replacers() {
+        let code = r#"
+            function psInstance(str) {
+                str = btoa(str);
+                var map = new Map([["Q", ".Y"], ["=", ".equal"]]);
+                for (let pair of map) {
+                    str = str.replace(new RegExp(pair[0], "g"), pair[1]);
+                }
+                return str;
+            }
+            const result = psInstance("A");
+        "#;
+        let expected = "function psInstance(str) {\n\tstr = btoa(str);\n\tvar map = new Map([[\"Q\", \".Y\"], [\"=\", \".equal\"]]);\n\tfor (let pair of map) {\n\t\tstr = str.replace(new RegExp(pair[0], \"g\"), pair[1]);\n\t}\n\treturn str;\n}\nconst result = \".Y.Y.equal.equal\";\n";
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert_transform("ResolveLocalCalls", code, expected, &result);
+    }
 }
 
 #[cfg(test)]
@@ -281,6 +329,18 @@ mod resolve_builtin_calls {
         "#;
         let expected =
             "const a = \"Hello\";\nconst b = [\"foo\", \"bar\"];\nconst c = \"1-2-3\";\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
+        assert_transform("ResolveBuiltinCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_nested_encoding_calls() {
+        let code = r#"
+            const a = decodeURIComponent(escape(atob("SGVsbG8gV29ybGQ=")));
+            const b = btoa(unescape("Hello%20World"));
+            const c = encodeURIComponent(decodeURIComponent("Hello%20World"));
+        "#;
+        let expected = "const a = \"Hello World\";\nconst b = \"SGVsbG8gV29ybGQ=\";\nconst c = \"Hello%20World\";\n";
         let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
         assert_transform("ResolveBuiltinCalls", code, expected, &result);
     }

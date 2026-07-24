@@ -45,6 +45,8 @@ impl ResolveBuiltinCalls {
                         | "encodeURIComponent"
                         | "decodeURI"
                         | "encodeURI"
+                        | "escape"
+                        | "unescape"
                         | "isNaN"
                         | "isFinite"
                 )
