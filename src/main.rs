@@ -12,7 +12,7 @@ use std::time::Duration;
 use clap::{ArgGroup, Parser as ClapParser};
 use oxc_span::SourceType;
 
-use restringer_rs::{DeobfuscateOptions, Restringer};
+use restringer_rs::{DeobfuscateOptions, Engine, Restringer, set_default_engine};
 
 #[derive(Debug, ClapParser)]
 #[command(name = "restringer", about = "REstringer - a JavaScript deobfuscator (Rust rewrite)")]
@@ -49,13 +49,32 @@ struct Cli {
     #[arg(long = "timeout-seconds")]
     timeout_seconds: Option<u64>,
 
-    /// Enable unsafe transforms (uses JavaScript runtime to evaluate expressions)
-    #[arg(short = 'u', long = "unsafe")]
-    run_unsafe: bool,
+    /// Disable unsafe transforms (they are enabled by default)
+    #[arg(long = "no-unsafe")]
+    no_unsafe: bool,
+
+    /// Unsafe transform engine to use: deno or quickjs (default: deno)
+    #[arg(long = "unsafe-engine", default_value = "deno")]
+    unsafe_engine: String,
 }
 
 fn main() {
     let cli = Cli::parse();
+
+    let engine = match cli.unsafe_engine.as_str() {
+        #[cfg(feature = "unsafe-transform-quickjs")]
+        "quickjs" => Engine::QuickJs,
+        #[cfg(feature = "unsafe-transform-deno")]
+        "deno" => Engine::Deno,
+        _ => {
+            eprintln!(
+                "[-] Critical Error: unsupported unsafe engine '{}'. Available: deno, quickjs",
+                cli.unsafe_engine
+            );
+            process::exit(2);
+        }
+    };
+    set_default_engine(engine);
 
     if cli.quiet && cli.verbose {
         eprintln!("[-] Critical Error: Don't set both -q and -v at the same time *smh*");
@@ -103,7 +122,7 @@ fn main() {
         &source_text,
         DeobfuscateOptions {
             clean: cli.clean,
-            run_unsafe: cli.run_unsafe,
+            run_unsafe: !cli.no_unsafe,
             max_iterations: cli.max_iterations,
             timeout: cli.timeout_seconds.map(Duration::from_secs),
             source_type: Some(source_type),

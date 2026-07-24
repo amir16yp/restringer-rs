@@ -310,7 +310,7 @@ function _yk(a) {
 		if (_yb("0x1b") !== _yb("0x1b")) {
 			result("0");
 		} else {
-			if (typeof c === _yb("0x2f")) {
+			if ("undefined" === _yb("0x2f")) {
 				if (_yb("0x24") === _yb("0x24")) {
 					return function(e) {}[_yb("0x26")](_yb("0x29"))[_yb("0x12")](_yb("0xb"));
 				} else {

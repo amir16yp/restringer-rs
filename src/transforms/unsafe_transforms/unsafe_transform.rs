@@ -54,12 +54,14 @@ pub trait UnsafeTransform: Transform {
         let codegen_result = Codegen::new()
             .with_options(CodegenOptions::default())
             .build(&program);
-        
+
         let mut code = codegen_result.code;
+        let trimmed = code.trim_end();
+        code.truncate(trimmed.len());
         if code.ends_with(';') {
             code.pop();
         }
-        
+
         Ok(code)
     }
 }

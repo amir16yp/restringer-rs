@@ -1,14 +1,33 @@
 pub mod helpers;
+pub mod engine;
+#[cfg(feature = "unsafe-transform-quickjs")]
+pub mod quickjs_engine;
+#[cfg(feature = "unsafe-transform-deno")]
+pub mod deno_engine;
 pub mod js_runtime;
 pub mod unsafe_transform;
 pub mod eval_constant_expressions;
 pub mod resolve_local_calls;
 pub mod resolve_augmented_function_wrapped_array_replacements;
 pub mod resolve_builtin_calls;
+pub mod resolve_eval_calls_on_non_literals;
+pub mod resolve_injected_prototype_method_calls;
+pub mod resolve_definite_binary_expressions;
+pub mod resolve_definite_member_expressions;
+pub mod resolve_deterministic_conditional_expressions;
+pub mod resolve_member_expressions_local_references;
+pub mod resolve_minimal_alphabet;
 
-pub use js_runtime::JsEvaluator;
+pub use engine::{Engine, JsEvaluator, set_default_engine};
 pub use unsafe_transform::{UnsafeTransform, UnsafeTransformHelper};
 pub use eval_constant_expressions::EvalConstantExpressions;
 pub use resolve_local_calls::ResolveLocalCalls;
 pub use resolve_augmented_function_wrapped_array_replacements::ResolveAugmentedFunctionWrappedArrayReplacements;
 pub use resolve_builtin_calls::ResolveBuiltinCalls;
+pub use resolve_eval_calls_on_non_literals::ResolveEvalCallsOnNonLiterals;
+pub use resolve_injected_prototype_method_calls::ResolveInjectedPrototypeMethodCalls;
+pub use resolve_definite_binary_expressions::ResolveDefiniteBinaryExpressions;
+pub use resolve_definite_member_expressions::ResolveDefiniteMemberExpressions;
+pub use resolve_deterministic_conditional_expressions::ResolveDeterministicConditionalExpressions;
+pub use resolve_member_expressions_local_references::ResolveMemberExpressionsLocalReferences;
+pub use resolve_minimal_alphabet::ResolveMinimalAlphabet;

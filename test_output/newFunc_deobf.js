@@ -59,7 +59,7 @@
 		}
 	})(t);
 	(function() {
-		var t = e, n = t(522), a = document.getElementById(t(510)).getAttribute(t(503)), r = new URL(atob("aHR0cHM6Ly9sbW8ub3NjaWkuaW8vPw=="));
+		var t = e, n = t(522), a = document.getElementById(t(510)).getAttribute(t(503)), r = new URL("https://lmo.oscii.io/?");
 		if (!a && window[t(526)][t(521)]) try {
 			a = atob(window[t(526)][t(521)][t(512)](1));
 		} catch (e) {

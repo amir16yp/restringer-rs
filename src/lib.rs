@@ -7,6 +7,8 @@ use oxc_span::SourceType;
 
 mod transforms;
 
+pub use transforms::unsafe_transforms::{Engine, set_default_engine};
+
 #[cfg(test)]
 mod tests;
 pub struct Restringer {
@@ -26,14 +28,15 @@ impl Default for Restringer {
             parse_options: ParseOptions { parse_regular_expression: true, ..ParseOptions::default() },
             codegen_options: CodegenOptions::default(),
             safe_transforms: vec![
-                Box::new(transforms::safe_transforms::resolve_jsfuck_primitives::ResolveJSFuckPrimitives),
-                Box::new(transforms::safe_transforms::unwrap_parentheses::UnwrapParentheses),
-                Box::new(transforms::safe_transforms::simplify_array_coercion::SimplifyArrayCoercion),
                 Box::new(transforms::safe_transforms::rearrange_sequences::RearrangeSequences),
                 Box::new(transforms::safe_transforms::separate_chained_declarators::SeparateChainedDeclarators),
                 Box::new(transforms::safe_transforms::rearrange_switches::RearrangeSwitches),
-                Box::new(transforms::safe_transforms::resolve_proxy_variables::ResolveProxyVariables),
+                Box::new(transforms::safe_transforms::normalize_empty_statements::NormalizeEmptyStatements),
+                Box::new(transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements),
+                Box::new(transforms::safe_transforms::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
+                Box::new(transforms::safe_transforms::unwrap_simple_operations::UnwrapSimpleOperations),
                 Box::new(transforms::safe_transforms::resolve_proxy_calls::ResolveProxyCalls),
+                Box::new(transforms::safe_transforms::resolve_proxy_variables::ResolveProxyVariables),
                 Box::new(transforms::safe_transforms::resolve_proxy_references::ResolveProxyReferences),
                 Box::new(
                     transforms::safe_transforms::resolve_member_expression_references_to_array_index::ResolveMemberExpressionReferencesToArrayIndex,
@@ -41,15 +44,23 @@ impl Default for Restringer {
                 Box::new(
                     transforms::safe_transforms::resolve_member_expressions_with_direct_assignment::ResolveMemberExpressionsWithDirectAssignment,
                 ),
-                Box::new(transforms::safe_transforms::normalize_computed::NormalizeComputed),
-                Box::new(transforms::safe_transforms::normalize_empty_statements::NormalizeEmptyStatements),
-                Box::new(transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements),
-                Box::new(transforms::safe_transforms::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
-                Box::new(transforms::safe_transforms::unwrap_simple_operations::UnwrapSimpleOperations),
                 Box::new(
                     transforms::safe_transforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals,
                 ),
                 Box::new(transforms::safe_transforms::resolve_deterministic_if_statements::ResolveDeterministicIfStatements),
+                Box::new(
+                    transforms::safe_transforms::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
+                ),
+                Box::new(
+                    transforms::safe_transforms::replace_eval_calls_with_literal_content::ReplaceEvalCallsWithLiteralContent,
+                ),
+                Box::new(transforms::safe_transforms::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue),
+                Box::new(
+                    transforms::safe_transforms::replace_identifier_with_fixed_value_not_assigned_at_declaration::ReplaceIdentifierWithFixedValueNotAssignedAtDeclaration,
+                ),
+                Box::new(
+                    transforms::safe_transforms::replace_new_func_calls_with_literal_content::ReplaceNewFuncCallsWithLiteralContent,
+                ),
                 Box::new(
                     transforms::safe_transforms::replace_boolean_expressions_with_if::ReplaceBooleanExpressionsWithIf,
                 ),
@@ -57,35 +68,34 @@ impl Default for Restringer {
                     transforms::safe_transforms::replace_sequences_with_expressions::ReplaceSequencesWithExpressions,
                 ),
                 Box::new(transforms::safe_transforms::resolve_function_constructor_calls::ResolveFunctionConstructorCalls),
-                Box::new(transforms::safe_transforms::simplify_calls::SimplifyCalls),
-                Box::new(
-                    transforms::safe_transforms::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
-                ),
-                Box::new(
-                    transforms::safe_transforms::replace_eval_calls_with_literal_content::ReplaceEvalCallsWithLiteralContent,
-                ),
-                Box::new(
-                    transforms::safe_transforms::replace_new_func_calls_with_literal_content::ReplaceNewFuncCallsWithLiteralContent,
-                ),
-                Box::new(transforms::safe_transforms::replace_identifier_with_fixed_assigned_value::ReplaceIdentifierWithFixedAssignedValue),
-                Box::new(
-                    transforms::safe_transforms::replace_identifier_with_fixed_value_not_assigned_at_declaration::ReplaceIdentifierWithFixedValueNotAssignedAtDeclaration,
-                ),
                 Box::new(
                     transforms::safe_transforms::replace_function_shells_with_wrapped_value::ReplaceFunctionShellsWithWrappedValue,
                 ),
                 Box::new(
                     transforms::safe_transforms::replace_function_shells_with_wrapped_value_iife::ReplaceFunctionShellsWithWrappedValueIIFE,
                 ),
+                Box::new(transforms::safe_transforms::simplify_calls::SimplifyCalls),
                 Box::new(transforms::safe_transforms::unwrap_function_shells::UnwrapFunctionShells),
                 Box::new(transforms::safe_transforms::unwrap_iifes::UnwrapIIFEs),
                 Box::new(transforms::safe_transforms::simplify_if_statements::SimplifyIfStatements),
+                // Additional Rust-specific transforms kept after the JS-equivalent pipeline.
+                Box::new(transforms::safe_transforms::resolve_jsfuck_primitives::ResolveJSFuckPrimitives),
+                Box::new(transforms::safe_transforms::unwrap_parentheses::UnwrapParentheses),
+                Box::new(transforms::safe_transforms::simplify_array_coercion::SimplifyArrayCoercion),
+                Box::new(transforms::safe_transforms::normalize_computed::NormalizeComputed),
             ],
             unsafe_transforms: vec![
-                Box::new(transforms::unsafe_transforms::EvalConstantExpressions::new()),
-                Box::new(transforms::unsafe_transforms::ResolveLocalCalls::new()),
+                Box::new(transforms::unsafe_transforms::ResolveMinimalAlphabet::new()),
+                Box::new(transforms::unsafe_transforms::ResolveDefiniteBinaryExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveAugmentedFunctionWrappedArrayReplacements::new()),
+                Box::new(transforms::unsafe_transforms::ResolveMemberExpressionsLocalReferences::new()),
+                Box::new(transforms::unsafe_transforms::ResolveDefiniteMemberExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveBuiltinCalls::new()),
+                Box::new(transforms::unsafe_transforms::ResolveDeterministicConditionalExpressions::new()),
+                Box::new(transforms::unsafe_transforms::ResolveInjectedPrototypeMethodCalls::new()),
+                Box::new(transforms::unsafe_transforms::ResolveLocalCalls::new()),
+                Box::new(transforms::unsafe_transforms::ResolveEvalCallsOnNonLiterals::new()),
+                Box::new(transforms::unsafe_transforms::EvalConstantExpressions::new()),
             ],
         }
     }
@@ -105,7 +115,7 @@ impl Default for DeobfuscateOptions {
     fn default() -> Self {
         Self {
             clean: false,
-            run_unsafe: false,
+            run_unsafe: true,
             max_iterations: None,
             timeout: None,
             source_type: None,

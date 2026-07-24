@@ -3,9 +3,14 @@ name = "restringer-rs"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["unsafe-transform-quickjs", "unsafe-transform-deno"]
+unsafe-transform-quickjs = ["rquickjs"]
+unsafe-transform-deno = []
+
 [dependencies]
  clap = { version = "4.6.0", features = ["derive"] }
- rquickjs = { version = "0.8", features = ["array-buffer", "classes"] }
+ rquickjs = { version = "0.8", features = ["array-buffer", "classes"], optional = true }
  oxc_allocator = "0.123.0"
  oxc_ast = "0.123.0"
  oxc_ast_visit = "0.123.0"

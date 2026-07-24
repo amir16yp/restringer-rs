@@ -793,7 +793,7 @@ var _0x2894dd = [
 ];
 const _0x29754e = (_0x41e312) => {
 	var _0x30e892 = _0x3d12;
-	if (typeof _0x41e312 !== _0x30e892(3)) return "";
+	if ("undefined" !== _0x30e892(3)) return "";
 	return _0x41e312[_0x30e892(4)](0)[_0x30e892(5) + "e"]() + _0x41e312[_0x30e892(6)](1);
 };
 function _0x18585b(_0x39d250, _0x5b10a5, _0x5e9dc9) {

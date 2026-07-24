@@ -23,7 +23,7 @@ var lo;
 			l[c] = v;
 			i = (a + x) % 1632567;
 		}
-		var s = String.fromCharCode(127);
+		var s = "";
 		var p = "";
 		var n = "%";
 		var u = "#1";
