@@ -71,17 +71,7 @@ impl<'a, 'b> VisitMut<'a> for FunctionToArrayVisitor<'a, 'b> {
             Some(Expression::CallExpression(c)) => c,
             _ => return,
         };
-        let callee_name = match &call.callee {
-            Expression::Identifier(id) => id.name.as_str(),
-            _ => return,
-        };
-        let (func_source, mutates) = match self.functions.get(callee_name) {
-            Some(info) => info,
-            None => return,
-        };
-        if *mutates {
-            return;
-        }
+
         let var_name = match &decl.id {
             BindingPattern::BindingIdentifier(id) => id.name.as_str(),
             _ => return,
@@ -90,13 +80,37 @@ impl<'a, 'b> VisitMut<'a> for FunctionToArrayVisitor<'a, 'b> {
             return;
         }
 
-        let call_expr = Expression::CallExpression(call.clone_in(self.allocator));
-        let call_code = match self.transform.expression_to_code(&call_expr) {
-            Ok(c) => c,
-            Err(_) => return,
+        let context = match &call.callee {
+            Expression::Identifier(id) => {
+                let callee_name = id.name.as_str();
+                let (func_source, mutates) = match self.functions.get(callee_name) {
+                    Some(info) => info,
+                    None => return,
+                };
+                if *mutates {
+                    return;
+                }
+
+                let call_expr = Expression::CallExpression(call.clone_in(self.allocator));
+                let call_code = match self.transform.expression_to_code(&call_expr) {
+                    Ok(c) => c,
+                    Err(_) => return,
+                };
+
+                format!("{};\n{};", func_source, call_code)
+            }
+            _ => {
+                if !is_iife_callee(&call.callee) {
+                    return;
+                }
+                let call_expr = Expression::CallExpression(call.clone_in(self.allocator));
+                match self.transform.expression_to_code(&call_expr) {
+                    Ok(c) => c,
+                    Err(_) => return,
+                }
+            }
         };
 
-        let context = format!("{};\n{};", func_source, call_code);
         if super::helpers::has_unresolved_references(&context, SourceType::mjs()) {
             return;
         }
@@ -242,12 +256,21 @@ fn gather_candidate_names(
         let Expression::CallExpression(call) = init else {
             continue;
         };
-        let Expression::Identifier(callee) = &call.callee else {
-            continue;
-        };
-        if functions.contains_key(callee.name.as_str()) {
+        if let Expression::Identifier(callee) = &call.callee {
+            if functions.contains_key(callee.name.as_str()) {
+                out.insert(id.name.to_string());
+            }
+        } else if is_iife_callee(&call.callee) {
             out.insert(id.name.to_string());
         }
+    }
+}
+
+fn is_iife_callee(expr: &Expression) -> bool {
+    match expr {
+        Expression::ParenthesizedExpression(paren) => is_iife_callee(&paren.expression),
+        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_) => true,
+        _ => false,
     }
 }
 
@@ -256,6 +279,7 @@ fn all_usages_are_member_reads(program: &Program, name: &str) -> bool {
         name,
         total: 0,
         safe: 0,
+        in_call_callee: false,
     };
     checker.visit_program(program);
     checker.total > 0 && checker.total == checker.safe
@@ -265,6 +289,7 @@ struct UsageChecker<'a> {
     name: &'a str,
     total: usize,
     safe: usize,
+    in_call_callee: bool,
 }
 
 impl<'a> Visit<'a> for UsageChecker<'a> {
@@ -274,9 +299,22 @@ impl<'a> Visit<'a> for UsageChecker<'a> {
         }
     }
 
+    fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
+        // Treat the callee as a non-safe use; arguments are normal.
+        self.in_call_callee = true;
+        self.visit_expression(&it.callee);
+        self.in_call_callee = false;
+
+        for arg in &it.arguments {
+            if let Some(expr) = arg.as_expression() {
+                self.visit_expression(expr);
+            }
+        }
+    }
+
     fn visit_member_expression(&mut self, it: &MemberExpression<'a>) {
         if let Expression::Identifier(id) = it.object() {
-            if id.name == self.name {
+            if id.name == self.name && !self.in_call_callee {
                 self.safe += 1;
             }
         }

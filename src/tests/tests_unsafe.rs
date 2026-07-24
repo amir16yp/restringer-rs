@@ -1,11 +1,24 @@
+use std::sync::Once;
+
 use crate::transforms::unsafe_transforms::eval_constant_expressions::EvalConstantExpressions;
+use crate::transforms::unsafe_transforms::engine::{Engine, set_default_engine};
 use crate::transforms::unsafe_transforms::js_runtime::JsEvaluator;
 use crate::transforms::unsafe_transforms::normalize_redundant_not_operator::NormalizeRedundantNotOperator;
+use crate::transforms::unsafe_transforms::resolve_caesar_plus::ResolveCaesarPlus;
 use crate::transforms::unsafe_transforms::resolve_function_to_array::ResolveFunctionToArray;
 use crate::transforms::unsafe_transforms::resolve_injected_prototype_method_calls::ResolveInjectedPrototypeMethodCalls;
 use crate::transforms::unsafe_transforms::resolve_literal_iife_results::ResolveLiteralIifeResults;
+use crate::transforms::unsafe_transforms::resolve_obfuscator_io::ResolveObfuscatorIoProtection;
 use crate::transforms::unsafe_transforms::resolve_packed_eval_calls::ResolvePackedEvalCalls;
 use crate::{DeobfuscateOptions, Restringer};
+
+static SET_ENGINE: Once = Once::new();
+
+fn ensure_quickjs_engine() {
+    SET_ENGINE.call_once(|| {
+        set_default_engine(Engine::QuickJs);
+    });
+}
 
 fn apply_module_to_code(code: &str, transform: Box<dyn crate::Transform>) -> String {
     let restringer = Restringer::default();
@@ -511,6 +524,22 @@ mod resolve_builtin_calls {
     }
 
     #[test]
+    fn resolves_builtin_alias_to_window_member() {
+        let code = "var OdP = window.decodeURIComponent;\nconst x = OdP('foo%20bar');";
+        let expected = "var OdP = window.decodeURIComponent;\nconst x = \"foo bar\";\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
+        assert_transform("ResolveBuiltinCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_builtin_alias_to_global_this_computed() {
+        let code = "var b = globalThis['atob'];\nconst y = b('SGVsbG8=');";
+        let expected = "var b = globalThis[\"atob\"];\nconst y = \"Hello\";\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
+        assert_transform("ResolveBuiltinCalls", code, expected, &result);
+    }
+
+    #[test]
     fn resolves_math_and_object_calls() {
         let code = r#"
             const a = Math.max(1, 2);
@@ -716,6 +745,101 @@ mod resolve_function_to_array {
         assert!(
             result.contains("var data = getArr()"),
             "expected call to stay when function mutates its binding; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn resolves_iife_returning_array() {
+        ensure_quickjs_engine();
+        let code = "const a = (function(){return ['One', 'Two', 'Three']})();\nconsole.log(a[0] + ' + ' + a[1] + ' = ' + a[2]);";
+        let expected = "const a = [\n\t\"One\",\n\t\"Two\",\n\t\"Three\"\n];\nconsole.log(a[0] + \" + \" + a[1] + \" = \" + a[2]);\n";
+        let result = apply_module_to_code(code, Box::new(ResolveFunctionToArray::new()));
+        assert_transform("ResolveFunctionToArray", code, expected, &result);
+    }
+
+    #[test]
+    fn skips_mixed_usage_with_member_calls() {
+        ensure_quickjs_engine();
+        let code = "function getArr() {return ['a', 'b', 'c']}\nconst data = getArr();\nconsole.log(data[0], data.length, data.slice(1));";
+        let result = apply_module_to_code(code, Box::new(ResolveFunctionToArray::new()));
+        assert!(
+            result.contains("const data = getArr()"),
+            "expected call to stay with mixed member usage; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod resolve_obfuscator_io {
+    use super::*;
+
+    #[test]
+    fn replaces_remove_cookie_method_with_bypass_string() {
+        let code = "var a = {\n  'removeCookie': function () {\n    return 'dev';\n  }\n};";
+        let result = apply_module_to_code(code, Box::new(ResolveObfuscatorIoProtection::new()));
+        assert!(
+            result.contains("removeCookie"),
+            "expected property key to remain; got: {}",
+            result
+        );
+        assert!(
+            result.contains("bypassed!"),
+            "expected bypass string; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("function () {\n\t\treturn 'dev';\n\t}"),
+            "expected function value to be replaced; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn replaces_new_state_method_with_bypass_string() {
+        let code = "var a = function (f) {\n  this['JoJo'] = function () {\n    return 'newState';\n  }\n};";
+        let result = apply_module_to_code(code, Box::new(ResolveObfuscatorIoProtection::new()));
+        assert!(
+            result.contains("JoJo"),
+            "expected property key to remain; got: {}",
+            result
+        );
+        assert!(
+            result.contains("bypassed!"),
+            "expected bypass string; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("return 'newState'"),
+            "expected newState function to be replaced; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod resolve_caesar_plus {
+    use super::*;
+
+    #[test]
+    fn extracts_inner_layer_from_dom_based_wrapper() {
+        ensure_quickjs_engine();
+        let code = r#"(function() {
+	const a = document.createElement('div');
+	const b = 'Y29uc29sZS5sb2co';
+	const c = 'IlJFc3RyaW5nZXIiKQ==';
+	a.innerHTML = b + c;
+	const atb = window.atob || function (val) {return Buffer.from(val, 'base64').toString()};
+	let dbt = {};
+	const abc = a.innerHTML;
+	dbt['toString'] = ''.constructor.constructor(atb(abc));
+	dbt = dbt + "this will execute dbt's toString method";
+})();"#;
+        let result = apply_module_to_code(code, Box::new(ResolveCaesarPlus::new()));
+        assert!(
+            result.contains("console.log(\"REstringer\")"),
+            "expected Caesar+ inner layer to be extracted; got: {}",
             result
         );
     }

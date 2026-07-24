@@ -104,6 +104,8 @@ impl Default for Restringer {
                 Box::new(transforms::safe_transforms::normalize_computed::NormalizeComputed),
             ],
             unsafe_transforms: vec![
+                Box::new(transforms::unsafe_transforms::ResolveObfuscatorIoProtection::new()),
+                Box::new(transforms::unsafe_transforms::ResolveCaesarPlus::new()),
                 Box::new(transforms::unsafe_transforms::ResolveMinimalAlphabet::new()),
                 Box::new(transforms::unsafe_transforms::ResolveDefiniteBinaryExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveAugmentedFunctionWrappedArrayReplacements::new()),

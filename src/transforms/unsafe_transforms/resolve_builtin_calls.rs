@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_span::GetSpan;
@@ -60,7 +62,11 @@ impl ResolveBuiltinCalls {
         }
     }
 
-    fn is_builtin_call(&self, call: &CallExpression) -> bool {
+    fn is_builtin_call(
+        &self,
+        call: &CallExpression,
+        aliases: &HashMap<String, String>,
+    ) -> bool {
         let args_ok = call.arguments.iter().all(|arg| {
             arg.as_expression()
                 .map_or(false, |e| self.is_safe_argument(e))
@@ -73,6 +79,9 @@ impl ResolveBuiltinCalls {
         match &call.callee {
             Expression::Identifier(ident) => {
                 let name = ident.name.as_str();
+                if aliases.contains_key(name) {
+                    return true;
+                }
                 matches!(
                     name,
                     "atob"
@@ -202,9 +211,11 @@ impl Transform for ResolveBuiltinCalls {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
+        let aliases = collect_builtin_aliases(program);
         let mut visitor = BuiltinVisitor {
             allocator: ctx.allocator,
             transform: self,
+            aliases,
             modified: false,
         };
         visitor.visit_program(program);
@@ -221,6 +232,7 @@ impl UnsafeTransform for ResolveBuiltinCalls {
 struct BuiltinVisitor<'a, 'b> {
     allocator: &'a oxc_allocator::Allocator,
     transform: &'b ResolveBuiltinCalls,
+    aliases: HashMap<String, String>,
     modified: bool,
 }
 
@@ -229,8 +241,24 @@ impl<'a, 'b> VisitMut<'a> for BuiltinVisitor<'a, 'b> {
         oxc_ast_visit::walk_mut::walk_expression(self, expr);
 
         if let Expression::CallExpression(call) = expr {
-            if self.transform.is_builtin_call(call) {
-                let call_code = helpers::expression_to_code(expr);
+            if self.transform.is_builtin_call(call, &self.aliases) {
+                let call_code = if let Expression::Identifier(ident) = &call.callee {
+                    if let Some(builtin) = self.aliases.get(ident.name.as_str()) {
+                        let args: Vec<String> = call
+                            .arguments
+                            .iter()
+                            .map(|arg| {
+                                helpers::expression_to_code(arg.as_expression().unwrap())
+                            })
+                            .collect();
+                        format!("{}({})", builtin, args.join(","))
+                    } else {
+                        helpers::expression_to_code(expr)
+                    }
+                } else {
+                    helpers::expression_to_code(expr)
+                };
+
                 if !call_code.is_empty() {
                     let full_code = format!("{};\n{}", helpers::EVAL_PRELUDE, call_code);
                     if let Ok(json_res) = self.transform.evaluator.eval_to_json(&full_code) {
@@ -245,4 +273,83 @@ impl<'a, 'b> VisitMut<'a> for BuiltinVisitor<'a, 'b> {
             }
         }
     }
+}
+
+fn collect_builtin_aliases(program: &Program) -> HashMap<String, String> {
+    let mut aliases = HashMap::new();
+    for stmt in &program.body {
+        if let Statement::VariableDeclaration(decl) = stmt {
+            for d in &decl.declarations {
+                let BindingPattern::BindingIdentifier(id) = &d.id else {
+                    continue;
+                };
+                let Some(init) = &d.init else {
+                    continue;
+                };
+                if let Some(path) = resolve_builtin_alias_path(init) {
+                    aliases.insert(id.name.to_string(), path);
+                }
+            }
+        }
+    }
+    aliases
+}
+
+fn is_host_global(name: &str) -> bool {
+    matches!(name, "window" | "globalThis" | "self" | "global")
+}
+
+fn is_host_object(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::Identifier(id) if is_host_global(id.name.as_str())
+    )
+}
+
+/// Resolves an expression like `window.decodeURIComponent`, `globalThis['atob']`,
+/// or `window.Math.max` to the underlying builtin path (`decodeURIComponent`,
+/// `atob`, `Math.max`) that can be evaluated directly without needing the host
+/// object to exist.
+fn resolve_builtin_alias_path(expr: &Expression) -> Option<String> {
+    let mut parts = Vec::new();
+    let mut current = expr;
+
+    loop {
+        match current {
+            Expression::Identifier(id) => {
+                let name = id.name.as_str();
+                if is_host_global(name) {
+                    // Host objects (window/globalThis) are dropped from the path.
+                } else if helpers::is_known_global(name) {
+                    parts.push(name.to_string());
+                } else {
+                    return None;
+                }
+                break;
+            }
+            Expression::StaticMemberExpression(mem) => {
+                parts.push(mem.property.name.to_string());
+                current = &mem.object;
+            }
+            Expression::ComputedMemberExpression(mem) => {
+                let prop = match &mem.expression {
+                    Expression::StringLiteral(s) => s.value.as_str(),
+                    _ => return None,
+                };
+                // Support host-based computed access such as globalThis['atob'].
+                if parts.is_empty() && is_host_object(&mem.object) {
+                    parts.push(prop.to_string());
+                    break;
+                }
+                return None;
+            }
+            _ => return None,
+        }
+    }
+
+    if parts.is_empty() {
+        return None;
+    }
+    parts.reverse();
+    Some(parts.join("."))
 }
