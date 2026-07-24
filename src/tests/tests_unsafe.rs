@@ -1,5 +1,6 @@
 use crate::transforms::unsafe_transforms::eval_constant_expressions::EvalConstantExpressions;
 use crate::transforms::unsafe_transforms::js_runtime::JsEvaluator;
+use crate::transforms::unsafe_transforms::resolve_injected_prototype_method_calls::ResolveInjectedPrototypeMethodCalls;
 use crate::transforms::unsafe_transforms::resolve_literal_iife_results::ResolveLiteralIifeResults;
 use crate::transforms::unsafe_transforms::resolve_packed_eval_calls::ResolvePackedEvalCalls;
 use crate::{DeobfuscateOptions, Restringer};
@@ -380,6 +381,22 @@ mod ant_regression {
         assert!(
             !result.code.contains("_$_2b1a["),
             "expected all string-array references to be resolved"
+        );
+    }
+}
+
+#[cfg(test)]
+mod resolve_injected_prototype_method_calls {
+    use super::*;
+
+    #[test]
+    fn resolves_prototype_assignment_inside_nested_function() {
+        let code = r#"(function () { function setup() { String.prototype.rot13 = function () { return "rot13-result"; }; } var secret = "abc"; setup(); console.log(secret.rot13()); })();"#;
+        let result = apply_module_to_code(code, Box::new(ResolveInjectedPrototypeMethodCalls::new()));
+        assert!(
+            result.contains("\"rot13-result\""),
+            "expected prototype method call to be resolved; got: {}",
+            result
         );
     }
 }

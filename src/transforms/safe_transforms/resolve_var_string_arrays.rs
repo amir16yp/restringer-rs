@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 use oxc_allocator::CloneIn;
 use oxc_ast::ast::*;
 use oxc_ast_visit::{Visit, VisitMut};
-use oxc_syntax::scope::ScopeFlags;
 
 use crate::{Transform, TransformCtx};
 
@@ -22,7 +21,7 @@ impl Transform for ResolveVarStringArrays {
 
         let mut v = Visitor {
             allocator: ctx.allocator,
-            arrays: HashMap::new(),
+            arrays: Vec::new(),
             mutated: mutated.names,
             modified: false,
         };
@@ -68,9 +67,32 @@ impl<'a> Visit<'a> for MutatedNameCollector {
 
 struct Visitor<'a> {
     allocator: &'a oxc_allocator::Allocator,
-    arrays: HashMap<String, oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>>,
+    arrays: Vec<HashMap<String, oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>>>,
     mutated: HashSet<String>,
     modified: bool,
+}
+
+impl<'a> Visitor<'a> {
+    fn enter_scope(&mut self) {
+        self.arrays.push(HashMap::new());
+    }
+
+    fn exit_scope(&mut self) {
+        self.arrays.pop();
+    }
+
+    fn current_scope(&mut self) -> &mut HashMap<String, oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
+        self.arrays.last_mut().unwrap()
+    }
+
+    fn lookup_array(&self, name: &str) -> Option<&oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
+        for scope in self.arrays.iter().rev() {
+            if let Some(el) = scope.get(name) {
+                return Some(el);
+            }
+        }
+        None
+    }
 }
 
 impl<'a> Visitor<'a> {
@@ -104,8 +126,9 @@ impl<'a> Visitor<'a> {
                     continue;
                 }
 
-                self.arrays
-                    .insert(name.to_string(), arr.elements.clone_in(self.allocator));
+                let allocator = self.allocator;
+                self.current_scope()
+                    .insert(name.to_string(), arr.elements.clone_in(allocator));
             }
         }
     }
@@ -137,7 +160,7 @@ impl<'a> Visitor<'a> {
             return None;
         };
         let name = obj.name.as_str();
-        let elements = self.arrays.get(name)?;
+        let elements = self.lookup_array(name)?;
 
         let idx = Self::numeric_literal_index(&mem.expression)?;
         if idx >= elements.len() {
@@ -149,64 +172,54 @@ impl<'a> Visitor<'a> {
         Some(expr.clone_in(self.allocator))
     }
 
-    fn drop_array_binding_in_declarator(
-        &mut self,
-        decl: &VariableDeclarator<'a>,
-    ) -> Option<oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
-        let BindingPattern::BindingIdentifier(binding) = &decl.id else {
-            return None;
-        };
-        self.arrays.remove(binding.name.as_str())
-    }
-
-    fn restore_array_binding_in_declarator(
-        &mut self,
-        decl: &VariableDeclarator<'a>,
-        elements: oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>,
-    ) {
-        let BindingPattern::BindingIdentifier(binding) = &decl.id else {
-            return;
-        };
-        self.arrays
-            .insert(binding.name.as_str().to_string(), elements);
-    }
 }
 
 impl<'a> VisitMut<'a> for Visitor<'a> {
     fn visit_program(&mut self, it: &mut Program<'a>) {
+        self.enter_scope();
         self.collect_arrays_from_statement_list(&it.body);
         oxc_ast_visit::walk_mut::walk_program(self, it);
+        self.exit_scope();
     }
 
     fn visit_function_body(&mut self, it: &mut FunctionBody<'a>) {
-        let prev = std::mem::take(&mut self.arrays);
+        self.enter_scope();
         self.collect_arrays_from_statement_list(&it.statements);
         oxc_ast_visit::walk_mut::walk_function_body(self, it);
-        self.arrays = prev;
+        self.exit_scope();
     }
 
     fn visit_block_statement(&mut self, it: &mut BlockStatement<'a>) {
-        let prev = std::mem::take(&mut self.arrays);
+        self.enter_scope();
         self.collect_arrays_from_statement_list(&it.body);
         oxc_ast_visit::walk_mut::walk_block_statement(self, it);
-        self.arrays = prev;
+        self.exit_scope();
     }
 
     fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'a>) {
-        let removed = self.drop_array_binding_in_declarator(it);
+        let binding_name = match &it.id {
+            BindingPattern::BindingIdentifier(binding) => binding.name.as_str().to_string(),
+            _ => {
+                oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
+                return;
+            }
+        };
+        // Hide the binding while walking the initializer so self-references are not resolved.
+        self.current_scope().remove(&binding_name);
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
-        if let Some(el) = removed {
-            self.restore_array_binding_in_declarator(it, el);
+        // Re-insert the (possibly resolved) local array so it shadows any inherited binding.
+        if let Some(Expression::ArrayExpression(arr)) = &it.init {
+            let allocator = self.allocator;
+            self.current_scope()
+                .insert(binding_name, arr.elements.clone_in(allocator));
         }
     }
 
     fn visit_assignment_expression(&mut self, it: &mut AssignmentExpression<'a>) {
-        let prev = self.modified;
-
         match &mut it.left {
             AssignmentTarget::ComputedMemberExpression(mem) => {
                 oxc_ast_visit::walk_mut::walk_expression(self, &mut mem.object);
-                oxc_ast_visit::walk_mut::walk_expression(self, &mut mem.expression);
+                self.visit_expression(&mut mem.expression);
             }
             AssignmentTarget::StaticMemberExpression(mem) => {
                 oxc_ast_visit::walk_mut::walk_expression(self, &mut mem.object);
@@ -216,8 +229,7 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
             }
         }
 
-        self.modified = prev;
-        oxc_ast_visit::walk_mut::walk_expression(self, &mut it.right);
+        self.visit_expression(&mut it.right);
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'a>) {
@@ -232,9 +244,4 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
         oxc_ast_visit::walk_mut::walk_expression(self, it);
     }
 
-    fn visit_function(&mut self, it: &mut Function<'a>, flags: ScopeFlags) {
-        let prev = std::mem::take(&mut self.arrays);
-        oxc_ast_visit::walk_mut::walk_function(self, it, flags);
-        self.arrays = prev;
-    }
 }

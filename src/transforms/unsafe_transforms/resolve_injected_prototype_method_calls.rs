@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use oxc_ast::ast::*;
-use oxc_ast_visit::VisitMut;
+use oxc_ast_visit::{Visit, VisitMut};
 use oxc_span::GetSpan;
 
 use super::engine::JsEvaluator;
@@ -32,45 +32,27 @@ impl Transform for ResolveInjectedPrototypeMethodCalls {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        // Collect prototype method assignments.
-        let mut prototypes: HashMap<
-            String,
-            (
-                String, /* type name */
-                String, /* assignment source */
-            ),
-        > = HashMap::new();
-        for stmt in &program.body {
-            if let Statement::ExpressionStatement(es) = stmt {
-                if let Expression::AssignmentExpression(assign) = &es.expression {
-                    if let Some((type_name, method_name)) =
-                        extract_prototype_assignment(&assign.left)
-                    {
-                        if is_valid_prototype_value(&assign.right) {
-                            let code = super::helpers::statement_to_code(stmt);
-                            prototypes
-                                .insert(method_name.to_string(), (type_name.to_string(), code));
-                        }
-                    }
-                }
-            }
-        }
+        let mut collector = PrototypeCollector {
+            source_text: ctx.source_text,
+            program_context: String::new(),
+            context_stack: Vec::new(),
+            prototypes: Vec::new(),
+        };
+        collector.visit_program(program);
 
-        if prototypes.is_empty() {
+        if collector.prototypes.is_empty() {
             return false;
         }
 
-        let context: String = prototypes
-            .values()
-            .map(|(_, code)| code.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let mut contexts: HashMap<String, (String, String)> = HashMap::new();
+        for p in collector.prototypes {
+            contexts.insert(p.method_name, (p.type_name, p.context_code));
+        }
 
         let mut visitor = InjectedMethodVisitor {
             allocator: ctx.allocator,
             transform: self,
-            prototypes,
-            context,
+            contexts,
             modified: false,
         };
         visitor.visit_program(program);
@@ -146,6 +128,87 @@ fn is_valid_prototype_value(expr: &Expression) -> bool {
     )
 }
 
+fn should_include_in_context(stmt: &Statement) -> bool {
+    match stmt {
+        Statement::VariableDeclaration(_) | Statement::FunctionDeclaration(_) => true,
+        Statement::ExpressionStatement(es) => {
+            matches!(es.expression, Expression::AssignmentExpression(_))
+        }
+        Statement::IfStatement(_) | Statement::BlockStatement(_) => true,
+        _ => false,
+    }
+}
+
+fn append_context<'a>(out: &mut String, source_text: &str, stmts: &[Statement<'a>]) {
+    for stmt in stmts {
+        if should_include_in_context(stmt) {
+            let span = stmt.span();
+            out.push_str(&source_text[span.start as usize..span.end as usize]);
+            out.push('\n');
+        }
+    }
+}
+
+fn build_context<'a>(source_text: &str, stmts: &[Statement<'a>]) -> String {
+    let mut out = String::new();
+    append_context(&mut out, source_text, stmts);
+    out
+}
+
+struct CollectedPrototype {
+    type_name: String,
+    method_name: String,
+    context_code: String,
+}
+
+struct PrototypeCollector<'a> {
+    source_text: &'a str,
+    program_context: String,
+    context_stack: Vec<String>,
+    prototypes: Vec<CollectedPrototype>,
+}
+
+impl<'a> PrototypeCollector<'a> {
+    fn enclosing_context(&self) -> String {
+        if self.context_stack.is_empty() {
+            return self.program_context.clone();
+        }
+        self.context_stack.join("\n")
+    }
+}
+
+impl<'a> Visit<'a> for PrototypeCollector<'a> {
+    fn visit_program(&mut self, it: &Program<'a>) {
+        self.program_context = build_context(self.source_text, &it.body);
+        oxc_ast_visit::walk::walk_program(self, it);
+    }
+
+    fn visit_function_body(&mut self, it: &FunctionBody<'a>) {
+        self.context_stack.push(build_context(self.source_text, &it.statements));
+        oxc_ast_visit::walk::walk_function_body(self, it);
+        self.context_stack.pop();
+    }
+
+    fn visit_assignment_expression(&mut self, it: &AssignmentExpression<'a>) {
+        if let Some((type_name, method_name)) = extract_prototype_assignment(&it.left) {
+            if is_valid_prototype_value(&it.right) {
+                let context_code = self.enclosing_context();
+                let span = it.span();
+                let assignment_code = format!(
+                    "{};",
+                    &self.source_text[span.start as usize..span.end as usize]
+                );
+                self.prototypes.push(CollectedPrototype {
+                    type_name: type_name.to_string(),
+                    method_name: method_name.to_string(),
+                    context_code: format!("{}\n{}", context_code, assignment_code),
+                });
+            }
+        }
+        oxc_ast_visit::walk::walk_assignment_expression(self, it);
+    }
+}
+
 fn literal_type_name(expr: &Expression) -> Option<&'static str> {
     match expr {
         Expression::StringLiteral(_) => Some("String"),
@@ -161,8 +224,7 @@ fn literal_type_name(expr: &Expression) -> Option<&'static str> {
 struct InjectedMethodVisitor<'a, 'b> {
     allocator: &'a oxc_allocator::Allocator,
     transform: &'b ResolveInjectedPrototypeMethodCalls,
-    prototypes: HashMap<String, (String, String)>,
-    context: String,
+    contexts: HashMap<String, (String, String)>,
     modified: bool,
 }
 
@@ -180,14 +242,15 @@ impl<'a, 'b> InjectedMethodVisitor<'a, 'b> {
             _ => return,
         };
 
-        let Some(object_type) = literal_type_name(object) else {
+        let Some((proto_type, context_code)) = self.contexts.get(prop_name) else {
             return;
         };
-        let Some((proto_type, _assignment_code)) = self.prototypes.get(prop_name) else {
-            return;
-        };
-        if proto_type != object_type {
-            return;
+
+        // For literal receivers, ensure the prototype type matches.
+        if let Some(object_type) = literal_type_name(object) {
+            if object_type != proto_type {
+                return;
+            }
         }
 
         let call_code = match self.transform.expression_to_code(expr) {
@@ -195,7 +258,10 @@ impl<'a, 'b> InjectedMethodVisitor<'a, 'b> {
             Err(_) => return,
         };
 
-        let full_code = format!("{};\n{}", self.context, call_code);
+        let full_code = format!(
+            "(function () {{\ntry {{\n{};\n}} catch (__e) {{}}\nreturn ({});\n}})()",
+            context_code, call_code
+        );
         match self.transform.evaluator().eval_to_json(&full_code) {
             Ok(json) => {
                 if let Some(new_expr) =

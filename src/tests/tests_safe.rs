@@ -4,8 +4,12 @@ use crate::transforms::safe_transforms::normalize_empty_statements::NormalizeEmp
 use crate::transforms::safe_transforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals;
 use crate::transforms::safe_transforms::rearrange_sequences::RearrangeSequences;
 use crate::transforms::safe_transforms::rearrange_switches::RearrangeSwitches;
+use crate::transforms::safe_transforms::inline_simple_aliases::InlineSimpleAliases;
 use crate::transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements;
 use crate::transforms::safe_transforms::resolve_builtin_string_calls::ResolveBuiltinStringCalls;
+use crate::transforms::safe_transforms::resolve_deterministic_if_statements::ResolveDeterministicIfStatements;
+use crate::transforms::safe_transforms::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions;
+use crate::transforms::safe_transforms::resolve_var_string_arrays::ResolveVarStringArrays;
 use crate::{DeobfuscateOptions, Restringer};
 
 fn apply_module_to_code(code: &str, transform: Box<dyn crate::Transform>) -> String {
@@ -609,5 +613,161 @@ mod inline_paired_array_pushes {
         let expected = "var keys = [];\nvar values = [];\nkeys.push(key);\nvalues.push(value);\nkeys.push(otherKey);\nvalues.push(otherValue);\n";
         let result = apply_module_to_code(code, Box::new(InlinePairedArrayPushes));
         assert_transform("InlinePairedArrayPushes", code, expected, &result);
+    }
+}
+
+#[cfg(test)]
+mod resolve_deterministic_if_statements {
+    use super::*;
+
+    #[test]
+    fn removes_dead_branch_on_known_truthy_identifier() {
+        let code = r#"var arr = [1,2,3]; function f() { if (!arr) { return; } console.log(arr); }"#;
+        let result = apply_module_to_code(code, Box::new(ResolveDeterministicIfStatements));
+        assert!(
+            !result.contains("if (!arr)"),
+            "expected dead branch to be removed; got: {}",
+            result
+        );
+        assert!(result.contains("console.log(arr)"), "got: {}", result);
+    }
+
+    #[test]
+    fn simplifies_function_equals_true_to_false() {
+        let code = r#"function run() { function decoder() {} if (decoder == true) { return; } else { var x = "value"; } } run();"#;
+        let result = apply_module_to_code(code, Box::new(ResolveDeterministicIfStatements));
+        assert!(
+            !result.contains("if (decoder == true)"),
+            "expected condition to be simplified; got: {}",
+            result
+        );
+        assert!(result.contains("x = \"value\""), "got: {}", result);
+    }
+
+    #[test]
+    fn simplifies_function_strict_equals_null() {
+        let code = r#"function run() { function decoder() {} if (decoder === null) { return; } else { var x = "value"; } } run();"#;
+        let result = apply_module_to_code(code, Box::new(ResolveDeterministicIfStatements));
+        assert!(
+            !result.contains("if (decoder === null)"),
+            "expected condition to be simplified; got: {}",
+            result
+        );
+        assert!(result.contains("x = \"value\""), "got: {}", result);
+    }
+}
+
+#[cfg(test)]
+mod resolve_redundant_logical_expressions {
+    use super::*;
+
+    #[test]
+    fn simplifies_truthy_identifier_in_logical_and() {
+        let code = r#"function f() { var x = "abc"; if (x && y) { doThing(); } }"#;
+        let result = apply_module_to_code(code, Box::new(ResolveRedundantLogicalExpressions));
+        assert!(
+            !result.contains("x && y"),
+            "expected left side of && to be dropped; got: {}",
+            result
+        );
+        assert!(result.contains("if (y)"), "got: {}", result);
+    }
+
+    #[test]
+    fn simplifies_truthy_left_in_logical_or() {
+        let code = r#"function f() { var x = "abc"; if (x || y) { doThing(); } }"#;
+        let result = apply_module_to_code(code, Box::new(ResolveRedundantLogicalExpressions));
+        assert!(
+            !result.contains("x || y"),
+            "expected || to collapse to left; got: {}",
+            result
+        );
+        assert!(result.contains("if (x)"), "got: {}", result);
+    }
+
+    #[test]
+    fn simplifies_literal_truthy_in_logical_and() {
+        let code = r#"if ("a" && cond) { doThing(); }"#;
+        let result = apply_module_to_code(code, Box::new(ResolveRedundantLogicalExpressions));
+        assert!(result.contains("if (cond)"), "got: {}", result);
+    }
+}
+
+#[cfg(test)]
+mod inline_simple_aliases {
+    use super::*;
+
+    #[test]
+    fn inlines_used_identifier_alias() {
+        let code = r#"function target() {} var alias = target; alias();"#;
+        let result = apply_module_to_code(code, Box::new(InlineSimpleAliases));
+        assert!(
+            result.contains("target();"),
+            "expected alias call to be inlined; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("var alias = target;"),
+            "expected alias declaration to be removed; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn does_not_inline_reassigned_alias() {
+        let code = r#"function target() {} var alias = target; alias = other; alias();"#;
+        let result = apply_module_to_code(code, Box::new(InlineSimpleAliases));
+        assert!(
+            result.contains("var alias = target;"),
+            "expected alias to remain when reassigned; got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
+mod resolve_var_string_arrays {
+    use super::*;
+
+    #[test]
+    fn tp_1_resolves_array_in_nested_function_body() {
+        let code = r#"(function () { var arr = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v"]; function inner() { console.log(arr[0]); } inner(); })();"#;
+        let result = apply_module_to_code(code, Box::new(ResolveVarStringArrays));
+        assert!(result.contains("console.log(\"a\")"), "expected array lookup to resolve in nested function; got: {}", result);
+    }
+
+    #[test]
+    fn tp_2_resolves_array_index_in_assignment_target() {
+        let code = r#"(function () { var arr = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","rot13"]; String.prototype[arr[22]] = function () { return this; }; })();"#;
+        let result = apply_module_to_code(code, Box::new(ResolveVarStringArrays));
+        assert!(result.contains("String.prototype[\"rot13\"]"), "expected assignment target property to resolve; got: {}", result);
+    }
+}
+
+#[cfg(test)]
+mod remove_unused_variables {
+    use super::*;
+    use crate::transforms::safe_transforms::remove_unused_variables::RemoveUnusedVariables;
+
+    #[test]
+    fn removes_unused_var_declaration() {
+        let code = r#"var unused; var used = 1; console.log(used);"#;
+        let result = apply_module_to_code(code, Box::new(RemoveUnusedVariables));
+        assert!(!result.contains("var unused"), "expected unused var to be removed; got: {}", result);
+        assert!(result.contains("var used"), "expected used var to remain; got: {}", result);
+    }
+
+    #[test]
+    fn removes_dead_literal_assignment() {
+        let code = r#"function f() { var x; x = "dead"; return 1; } f();"#;
+        let result = apply_module_to_code(code, Box::new(RemoveUnusedVariables));
+        assert!(!result.contains("x = \"dead\""), "expected dead assignment to be removed; got: {}", result);
+    }
+
+    #[test]
+    fn keeps_used_var() {
+        let code = r#"function f() { var x = 1; return x; } f();"#;
+        let result = apply_module_to_code(code, Box::new(RemoveUnusedVariables));
+        assert!(result.contains("var x"), "expected used var to remain; got: {}", result);
     }
 }

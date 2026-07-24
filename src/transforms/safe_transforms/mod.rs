@@ -1,4 +1,5 @@
 pub mod inline_paired_array_pushes;
+pub mod inline_simple_aliases;
 pub mod normalize_computed;
 pub mod normalize_empty_statements;
 pub mod parse_template_literals_into_string_literals;
@@ -6,6 +7,7 @@ pub mod rearrange_sequences;
 pub mod rearrange_switches;
 pub mod remove_redundant_block_statements;
 pub mod remove_resolved_var_string_arrays;
+pub mod remove_unused_variables;
 pub mod rename_local_identifiers;
 pub mod replace_boolean_expressions_with_if;
 pub mod replace_call_expressions_with_unwrapped_identifier;

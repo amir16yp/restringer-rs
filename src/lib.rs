@@ -59,6 +59,8 @@ impl Default for Restringer {
                 ),
                 Box::new(transforms::safe_transforms::resolve_builtin_string_calls::ResolveBuiltinStringCalls),
                 Box::new(transforms::safe_transforms::resolve_deterministic_if_statements::ResolveDeterministicIfStatements),
+                Box::new(transforms::safe_transforms::inline_simple_aliases::InlineSimpleAliases),
+                Box::new(transforms::safe_transforms::remove_unused_variables::RemoveUnusedVariables),
                 Box::new(
                     transforms::safe_transforms::replace_call_expressions_with_unwrapped_identifier::ReplaceCallExpressionsWithUnwrappedIdentifier,
                 ),
