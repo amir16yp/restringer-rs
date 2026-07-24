@@ -66,9 +66,6 @@ impl<'a> Resolver<'a> {
         match expr {
             Expression::NumericLiteral(n) => Some(n.value),
             Expression::UnaryExpression(un) if un.operator == UnaryOperator::UnaryPlus => {
-                if let Some(bool_val) = self.try_eval_to_bool(&un.argument) {
-                    return Some(if bool_val { 1.0 } else { 0.0 });
-                }
                 self.try_eval_to_number(&un.argument)
             }
             Expression::UnaryExpression(un) if un.operator == UnaryOperator::UnaryNegation => {
@@ -82,12 +79,10 @@ impl<'a> Resolver<'a> {
             }
             _ if self.is_empty_array(expr) => Some(0.0),
             Expression::ArrayExpression(arr) => {
-                // Single-element arrays convert to their element's numeric value
-                if arr.elements.len() == 1 {
-                    if let ArrayExpressionElement::SpreadElement(_) = &arr.elements[0] {
-                        return None;
-                    }
-                    self.try_eval_to_number(arr.elements[0].to_expression())
+                // Empty arrays coerce to "" then 0. Non-empty arrays join to a string
+                // before coercion, so we cannot statically determine the number.
+                if arr.elements.is_empty() {
+                    Some(0.0)
                 } else {
                     None
                 }
@@ -101,6 +96,11 @@ impl<'a> Resolver<'a> {
                 }
             }
             Expression::BinaryExpression(bin) if bin.operator == BinaryOperator::Addition => {
+                // Addition is string concatenation when either operand coerces to a string
+                // (arrays always coerce to strings). Do not treat it as numeric addition.
+                if self.has_string_operand(&bin.left) || self.has_string_operand(&bin.right) {
+                    return None;
+                }
                 let left = self.try_eval_to_number(&bin.left)?;
                 let right = self.try_eval_to_number(&bin.right)?;
                 Some(left + right)

@@ -399,13 +399,11 @@ mod resolve_jsfuck_primitives {
 
     #[test]
     fn test_jsfuck_file() {
-        let code = include_str!("resources/jsfuck.js");
+        let code = include_str!("../../restringer-js/tests/resources/jsfuck.js");
         let restringer = Restringer::default();
         let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
         assert!(result.modified);
-        // JSFuck is extremely complex and may not fully deobfuscate
-        // Just verify that the transform made progress
-        assert!(result.code.len() < code.len() || result.code.contains("false") || result.code.contains("true"));
+        assert_eq!(result.code, "alert(1);\n");
     }
 
     #[test]

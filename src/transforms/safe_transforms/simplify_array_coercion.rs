@@ -78,15 +78,16 @@ impl<'a> Visitor<'a> {
 
     fn try_simplify_binary(&mut self, expr: &BinaryExpression<'a>) -> Option<Expression<'a>> {
         match expr.operator {
-            BinaryOperator::Addition
-            | BinaryOperator::Subtraction
+            // Addition coerces arrays/objects to strings, not numbers, so this
+            // transform must not rewrite e.g. 1 + [0] ("10") into 1.
+            BinaryOperator::Addition => None,
+            BinaryOperator::Subtraction
             | BinaryOperator::Multiplication
             | BinaryOperator::Division => {
                 let left_num = self.try_eval_to_number(&expr.left)?;
                 let right_num = self.try_eval_to_number(&expr.right)?;
-                
+
                 let result = match expr.operator {
-                    BinaryOperator::Addition => left_num + right_num,
                     BinaryOperator::Subtraction => left_num - right_num,
                     BinaryOperator::Multiplication => left_num * right_num,
                     BinaryOperator::Division => {
@@ -98,7 +99,7 @@ impl<'a> Visitor<'a> {
                     }
                     _ => return None,
                 };
-                
+
                 Some(self.make_number(expr.span, result))
             }
             _ => None,

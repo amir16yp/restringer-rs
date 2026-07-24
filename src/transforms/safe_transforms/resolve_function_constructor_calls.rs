@@ -95,15 +95,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn maybe_resolve(&self, call: &CallExpression<'a>) -> Option<Expression<'a>> {
-        let object = self.is_constructor_member(&call.callee)?;
-
-        // Must be `Function.constructor(...)` or `Something.constructor(...)`? JS version doesn't constrain object.
-        // Keep conservative: only handle `Function.constructor` or `(function(){}).constructor` etc.
-        // We'll accept any object as long as it is the identifier `Function`.
-        let Expression::Identifier(id) = self.unwrap_parens(object) else { return None; };
-        if id.name.as_str() != "Function" {
-            return None;
-        }
+        self.is_constructor_member(&call.callee)?;
 
         if call.arguments.is_empty() {
             return None;

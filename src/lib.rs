@@ -24,7 +24,7 @@ impl Default for Restringer {
     fn default() -> Self {
         Self {
             normalize: true,
-            max_iterations: 100,
+            max_iterations: 1_000,
             parse_options: ParseOptions { parse_regular_expression: true, ..ParseOptions::default() },
             codegen_options: CodegenOptions::default(),
             safe_transforms: vec![
