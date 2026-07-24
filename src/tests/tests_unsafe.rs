@@ -243,6 +243,27 @@ mod eval_constant_expressions {
 }
 
 #[cfg(test)]
+mod resolve_member_expressions_local_references {
+    use super::*;
+    use crate::transforms::unsafe_transforms::resolve_member_expressions_local_references::ResolveMemberExpressionsLocalReferences;
+
+    #[test]
+    fn keeps_reads_of_mutated_function_properties() {
+        let code = r#"var decode = function (key) { if (decode.cache === undefined) { decode.cache = {}; } var value = decode.cache[key]; decode.cache[key] = value; return value; }; decode("x");"#;
+        let result = apply_module_to_code(
+            code,
+            Box::new(ResolveMemberExpressionsLocalReferences::new()),
+        );
+        assert!(result.contains("decode.cache[key]"), "got: {}", result);
+        assert!(
+            result.contains("decode.cache === undefined"),
+            "got: {}",
+            result
+        );
+    }
+}
+
+#[cfg(test)]
 mod resolve_local_calls {
     use super::*;
     use crate::transforms::unsafe_transforms::resolve_local_calls::ResolveLocalCalls;
@@ -253,6 +274,21 @@ mod resolve_local_calls {
         let expected = "function add(a, b) {\n\treturn a + b;\n}\nconst res = 15;\n";
         let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
         assert_transform("ResolveLocalCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_calls_with_large_static_array_dependencies() {
+        let elements = (0..800)
+            .map(|index| format!(r#""value-{index}""#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let code = format!(
+            "var table = [{elements}]; function decode(index) {{ return table[index]; }} decode(799);"
+        );
+        assert!(code.len() > 5_000);
+        let result = apply_module_to_code(&code, Box::new(ResolveLocalCalls::new()));
+        assert!(result.contains(r#""value-799";"#), "got: {}", result);
+        assert!(!result.contains("decode(799)"), "got: {}", result);
     }
 
     #[test]
@@ -367,6 +403,20 @@ mod ant_regression {
         assert!(
             result.code.contains("window.ant_zero"),
             "expected window property assignments to remain in output"
+        );
+    }
+
+    #[test]
+    fn test_ds_js_resolves_rotated_decoder_array() {
+        let code = include_str!("../../restringer-js/tests/resources/ds.js");
+        let restringer = Restringer::default();
+        let result = restringer
+            .deobfuscate(code, DeobfuscateOptions::default())
+            .unwrap();
+        assert!(result.modified);
+        assert!(
+            !result.code.contains("_0x2cb1("),
+            "expected all rotated decoder calls to be resolved"
         );
     }
 

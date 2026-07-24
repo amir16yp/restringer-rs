@@ -63,6 +63,14 @@ mod remove_redundant_block_statements {
     }
 
     #[test]
+    fn tp_function_body_block() {
+        let code = "function f() { { do_a(); } }";
+        let expected = "function f() {\n\tdo_a();\n}\n";
+        let result = apply_module_to_code(code, Box::new(RemoveRedundantBlockStatements));
+        assert_transform("RemoveRedundantBlockStatements", code, expected, &result);
+    }
+
+    #[test]
     fn tp_4() {
         let code = "if (a) {{{{{do_a();}}}} do_b();}";
         let expected = "if (a) {\n\tdo_a();\n\tdo_b();\n}\n";
@@ -640,6 +648,33 @@ true;
     }
 
     #[test]
+    fn tp_15_resolve_literal_split() {
+        let code = r#""abc".split(""); "a,b,c"["split"](",", 2);"#;
+        let expected = "[\n\t\"a\",\n\t\"b\",\n\t\"c\"\n];\n[\"a\", \"b\"];\n";
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_16_resolve_literal_string_array_join() {
+        let code = r#"["a", "b", "c"].join(""); ["a", "b"]["join"]();"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert!(result.contains(r#"("abc")"#), "got: {}", result);
+        assert!(result.contains(r#""a,b""#), "got: {}", result);
+    }
+
+    #[test]
+    fn tn_4_keep_dynamic_split_and_join() {
+        let code = r#"value.split(""); ["a", value].join(""); "abc".split(separator);"#;
+        let expected = r#"value.split("");
+["a", value].join("");
+"abc".split(separator);
+"#;
+        let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
+        assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+
+    #[test]
     fn tn_1_no_resolve_with_non_literal_argument() {
         let code = r#""abc".charAt(i);"#;
         let expected = "\"abc\".charAt(i);\n";
@@ -782,6 +817,13 @@ mod resolve_redundant_logical_expressions {
     }
 
     #[test]
+    fn keeps_identifier_truthiness_after_loop_assignment() {
+        let code = r#"function convert(n) { var result = ""; while (n > 0) { result = "x" + result; n--; } return result || "0"; }"#;
+        let result = apply_module_to_code(code, Box::new(ResolveRedundantLogicalExpressions));
+        assert!(result.contains("result || \"0\""), "got: {}", result);
+    }
+
+    #[test]
     fn simplifies_literal_truthy_in_logical_and() {
         let code = r#"if ("a" && cond) { doThing(); }"#;
         let result = apply_module_to_code(code, Box::new(ResolveRedundantLogicalExpressions));
@@ -807,6 +849,14 @@ mod inline_simple_aliases {
             "expected alias declaration to be removed; got: {}",
             result
         );
+    }
+
+    #[test]
+    fn does_not_cross_contaminate_same_name_from_different_scopes() {
+        let code = r#"(function () { var value = function (arg) { return arg; }; value(1); })(); function other() { var value = source; return value; }"#;
+        let result = apply_module_to_code(code, Box::new(InlineSimpleAliases));
+        assert!(result.contains("value(1)"), "got: {}", result);
+        assert!(result.contains("var value = function"), "got: {}", result);
     }
 
     #[test]
@@ -843,6 +893,17 @@ mod resolve_var_string_arrays {
         assert!(
             result.contains("String.prototype[\"rot13\"]"),
             "expected assignment target property to resolve; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn tp_3_inlines_string_array_into_non_mutating_method_calls() {
+        let code = r#"function convert(end) { var alphabet = ["0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f","g","h","i","j","k"]; return alphabet.slice(0, end); }"#;
+        let result = apply_module_to_code(code, Box::new(ResolveVarStringArrays));
+        assert!(
+            result.contains(r#"[..."0123456789abcdefghijk"].slice(0, end)"#),
+            "expected compact character array to be inlined into slice call; got: {}",
             result
         );
     }

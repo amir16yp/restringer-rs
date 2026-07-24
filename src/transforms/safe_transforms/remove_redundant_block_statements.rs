@@ -55,6 +55,11 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
         oxc_ast_visit::walk_mut::walk_program(self, it);
     }
 
+    fn visit_function_body(&mut self, it: &mut FunctionBody<'a>) {
+        self.flatten_statements(&mut it.statements);
+        oxc_ast_visit::walk_mut::walk_function_body(self, it);
+    }
+
     fn visit_block_statement(&mut self, it: &mut BlockStatement<'a>) {
         self.flatten_statements(&mut it.body);
         oxc_ast_visit::walk_mut::walk_block_statement(self, it);

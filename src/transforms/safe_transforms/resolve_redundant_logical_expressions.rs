@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use oxc_allocator::CloneIn;
 use oxc_ast::ast::*;
-use oxc_ast_visit::VisitMut;
+use oxc_ast_visit::{Visit, VisitMut};
 
 use crate::{Transform, TransformCtx};
 
@@ -14,10 +14,13 @@ impl Transform for ResolveRedundantLogicalExpressions {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
+        let mut mutation_collector = MutationCollector::default();
+        mutation_collector.visit_program(program);
         let mut v = Visitor {
             allocator: ctx.allocator,
             modified: false,
             known: Vec::new(),
+            mutated: mutation_collector.names,
         };
         v.visit_program(program);
         v.modified
@@ -39,6 +42,28 @@ struct Visitor<'a> {
     allocator: &'a oxc_allocator::Allocator,
     modified: bool,
     known: Vec<HashMap<String, KnownValue>>,
+    mutated: HashSet<String>,
+}
+
+#[derive(Default)]
+struct MutationCollector {
+    names: HashSet<String>,
+}
+
+impl<'a> Visit<'a> for MutationCollector {
+    fn visit_assignment_expression(&mut self, it: &AssignmentExpression<'a>) {
+        if let AssignmentTarget::AssignmentTargetIdentifier(identifier) = &it.left {
+            self.names.insert(identifier.name.to_string());
+        }
+        oxc_ast_visit::walk::walk_assignment_expression(self, it);
+    }
+
+    fn visit_update_expression(&mut self, it: &UpdateExpression<'a>) {
+        if let SimpleAssignmentTarget::AssignmentTargetIdentifier(identifier) = &it.argument {
+            self.names.insert(identifier.name.to_string());
+        }
+        oxc_ast_visit::walk::walk_update_expression(self, it);
+    }
 }
 
 fn binding_pattern_name<'a>(pat: &BindingPattern<'a>) -> Option<String> {
@@ -119,6 +144,9 @@ impl<'a> Visitor<'a> {
             if let Statement::VariableDeclaration(decl) = stmt {
                 for d in &decl.declarations {
                     if let Some(name) = binding_pattern_name(&d.id) {
+                        if self.mutated.contains(&name) {
+                            continue;
+                        }
                         if let Some(init) = &d.init {
                             if let Some(v) = known_value(init) {
                                 self.bind(name, v);
@@ -171,7 +199,6 @@ impl<'a> Visitor<'a> {
         };
 
         let left_truthy = self.truthiness(&logical.left);
-        let right_truthy = self.truthiness(&logical.right);
 
         let replacement = match logical.operator {
             LogicalOperator::And => {
@@ -180,12 +207,6 @@ impl<'a> Visitor<'a> {
                         logical.right.clone_in(self.allocator)
                     } else {
                         logical.left.clone_in(self.allocator)
-                    })
-                } else if let Some(t) = right_truthy {
-                    Some(if t {
-                        logical.left.clone_in(self.allocator)
-                    } else {
-                        logical.right.clone_in(self.allocator)
                     })
                 } else {
                     None
@@ -197,12 +218,6 @@ impl<'a> Visitor<'a> {
                         logical.left.clone_in(self.allocator)
                     } else {
                         logical.right.clone_in(self.allocator)
-                    })
-                } else if let Some(t) = right_truthy {
-                    Some(if t {
-                        logical.right.clone_in(self.allocator)
-                    } else {
-                        logical.left.clone_in(self.allocator)
                     })
                 } else {
                     None

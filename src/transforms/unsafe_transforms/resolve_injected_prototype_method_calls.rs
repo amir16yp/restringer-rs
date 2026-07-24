@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::ast::*;
 use oxc_ast_visit::{Visit, VisitMut};
 use oxc_span::GetSpan;
@@ -33,7 +34,6 @@ impl Transform for ResolveInjectedPrototypeMethodCalls {
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
         let mut collector = PrototypeCollector {
-            source_text: ctx.source_text,
             program_context: String::new(),
             context_stack: Vec::new(),
             prototypes: Vec::new(),
@@ -139,19 +139,18 @@ fn should_include_in_context(stmt: &Statement) -> bool {
     }
 }
 
-fn append_context<'a>(out: &mut String, source_text: &str, stmts: &[Statement<'a>]) {
+fn append_context<'a>(out: &mut String, stmts: &[Statement<'a>]) {
     for stmt in stmts {
         if should_include_in_context(stmt) {
-            let span = stmt.span();
-            out.push_str(&source_text[span.start as usize..span.end as usize]);
+            out.push_str(&super::helpers::statement_to_code(stmt));
             out.push('\n');
         }
     }
 }
 
-fn build_context<'a>(source_text: &str, stmts: &[Statement<'a>]) -> String {
+fn build_context<'a>(stmts: &[Statement<'a>]) -> String {
     let mut out = String::new();
-    append_context(&mut out, source_text, stmts);
+    append_context(&mut out, stmts);
     out
 }
 
@@ -161,14 +160,13 @@ struct CollectedPrototype {
     context_code: String,
 }
 
-struct PrototypeCollector<'a> {
-    source_text: &'a str,
+struct PrototypeCollector {
     program_context: String,
     context_stack: Vec<String>,
     prototypes: Vec<CollectedPrototype>,
 }
 
-impl<'a> PrototypeCollector<'a> {
+impl PrototypeCollector {
     fn enclosing_context(&self) -> String {
         if self.context_stack.is_empty() {
             return self.program_context.clone();
@@ -177,15 +175,14 @@ impl<'a> PrototypeCollector<'a> {
     }
 }
 
-impl<'a> Visit<'a> for PrototypeCollector<'a> {
+impl<'a> Visit<'a> for PrototypeCollector {
     fn visit_program(&mut self, it: &Program<'a>) {
-        self.program_context = build_context(self.source_text, &it.body);
+        self.program_context = build_context(&it.body);
         oxc_ast_visit::walk::walk_program(self, it);
     }
 
     fn visit_function_body(&mut self, it: &FunctionBody<'a>) {
-        self.context_stack
-            .push(build_context(self.source_text, &it.statements));
+        self.context_stack.push(build_context(&it.statements));
         oxc_ast_visit::walk::walk_function_body(self, it);
         self.context_stack.pop();
     }
@@ -194,11 +191,13 @@ impl<'a> Visit<'a> for PrototypeCollector<'a> {
         if let Some((type_name, method_name)) = extract_prototype_assignment(&it.left) {
             if is_valid_prototype_value(&it.right) {
                 let context_code = self.enclosing_context();
-                let span = it.span();
-                let assignment_code = format!(
-                    "{};",
-                    &self.source_text[span.start as usize..span.end as usize]
-                );
+                let allocator = Allocator::default();
+                let assignment = Expression::AssignmentExpression(oxc_allocator::Box::new_in(
+                    it.clone_in(&allocator),
+                    &allocator,
+                ));
+                let assignment_code =
+                    format!("{};", super::helpers::expression_to_code(&assignment));
                 self.prototypes.push(CollectedPrototype {
                     type_name: type_name.to_string(),
                     method_name: method_name.to_string(),

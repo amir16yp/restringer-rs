@@ -1,8 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use oxc_allocator::CloneIn;
+use std::cell::Cell;
+
+use oxc_allocator::{Box as ArenaBox, CloneIn};
 use oxc_ast::ast::*;
 use oxc_ast_visit::{Visit, VisitMut};
+use oxc_span::GetSpan;
+use oxc_syntax::node::NodeId;
 
 use crate::{Transform, TransformCtx};
 
@@ -157,6 +161,58 @@ impl<'a> Visitor<'a> {
         }
     }
 
+    fn inline_array_object_if_possible(&self, object: &Expression<'a>) -> Option<Expression<'a>> {
+        let Expression::Identifier(identifier) = object else {
+            return None;
+        };
+        let source_elements = self.lookup_array(identifier.name.as_str())?;
+        let mut characters = String::new();
+        let all_single_characters = source_elements.iter().all(|element| {
+            let Some(Expression::StringLiteral(literal)) = element.as_expression() else {
+                return false;
+            };
+            if literal.value.chars().count() != 1 {
+                return false;
+            }
+            characters.push_str(literal.value.as_str());
+            true
+        });
+        let elements = if all_single_characters {
+            let value = self.allocator.alloc_str(&characters);
+            let string = Expression::StringLiteral(ArenaBox::new_in(
+                StringLiteral {
+                    node_id: Cell::new(NodeId::DUMMY),
+                    span: object.span(),
+                    value: value.into(),
+                    raw: None,
+                    lone_surrogates: false,
+                },
+                self.allocator,
+            ));
+            let spread = SpreadElement {
+                node_id: Cell::new(NodeId::DUMMY),
+                span: object.span(),
+                argument: string,
+            };
+            let mut elements = oxc_allocator::Vec::new_in(self.allocator);
+            elements.push(ArrayExpressionElement::SpreadElement(ArenaBox::new_in(
+                spread,
+                self.allocator,
+            )));
+            elements
+        } else {
+            source_elements.clone_in(self.allocator)
+        };
+        Some(Expression::ArrayExpression(ArenaBox::new_in(
+            ArrayExpression {
+                node_id: Cell::new(NodeId::DUMMY),
+                span: object.span(),
+                elements,
+            },
+            self.allocator,
+        )))
+    }
+
     fn replace_computed_member_if_possible(
         &mut self,
         mem: &ComputedMemberExpression<'a>,
@@ -213,9 +269,11 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
         // Re-insert the (possibly resolved) local array so it shadows any inherited binding.
         if let Some(Expression::ArrayExpression(arr)) = &it.init {
-            let allocator = self.allocator;
-            self.current_scope()
-                .insert(binding_name, arr.elements.clone_in(allocator));
+            if arr.elements.len() > MIN_ARRAY_LENGTH && !self.mutated.contains(&binding_name) {
+                let allocator = self.allocator;
+                self.current_scope()
+                    .insert(binding_name, arr.elements.clone_in(allocator));
+            }
         }
     }
 
@@ -237,6 +295,18 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'a>) {
+        if let Expression::StaticMemberExpression(mem) = it {
+            if matches!(
+                mem.property.name.as_str(),
+                "slice" | "indexOf" | "lastIndexOf" | "includes" | "join" | "concat"
+            ) {
+                if let Some(array) = self.inline_array_object_if_possible(&mem.object) {
+                    mem.object = array;
+                    self.modified = true;
+                }
+            }
+        }
+
         if let Expression::ComputedMemberExpression(mem) = it {
             if let Some(repl) = self.replace_computed_member_if_possible(mem) {
                 *it = repl;

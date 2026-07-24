@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use oxc_allocator::Box as ArenaBox;
+use oxc_allocator::{Box as ArenaBox, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_span::Span;
@@ -113,6 +113,122 @@ impl<'a> Visitor<'a> {
             },
             self.allocator,
         ))
+    }
+
+    fn make_string_array(
+        &self,
+        span: Span,
+        values: impl IntoIterator<Item = String>,
+    ) -> Expression<'a> {
+        let mut elements = ArenaVec::new_in(self.allocator);
+        for value in values {
+            elements.push(ArrayExpressionElement::from(
+                self.make_string_literal(span, &value),
+            ));
+        }
+        Expression::ArrayExpression(ArenaBox::new_in(
+            ArrayExpression {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                elements,
+            },
+            self.allocator,
+        ))
+    }
+
+    fn member_object_and_name<'b>(
+        &'b self,
+        call: &'b CallExpression<'a>,
+    ) -> Option<(&'b Expression<'a>, &'b str)> {
+        match self.unwrap_parens(&call.callee) {
+            Expression::StaticMemberExpression(member) => {
+                Some((&member.object, member.property.name.as_str()))
+            }
+            Expression::ComputedMemberExpression(member) => {
+                let Expression::StringLiteral(property) = self.unwrap_parens(&member.expression)
+                else {
+                    return None;
+                };
+                Some((&member.object, property.value.as_str()))
+            }
+            _ => None,
+        }
+    }
+
+    fn resolve_split(&self, call: &CallExpression<'a>) -> Option<Expression<'a>> {
+        let (object, property) = self.member_object_and_name(call)?;
+        if property != "split" || call.arguments.len() > 2 {
+            return None;
+        }
+        let Expression::StringLiteral(value) = self.unwrap_parens(object) else {
+            return None;
+        };
+        let limit = match call.arguments.get(1) {
+            Some(argument) => {
+                let limit = self.as_integer_literal(argument.as_expression()?)?;
+                u32::try_from(limit).ok()? as usize
+            }
+            None => u32::MAX as usize,
+        };
+        if limit == 0 {
+            return Some(self.make_string_array(call.span, std::iter::empty()));
+        }
+        let Some(separator_argument) = call.arguments.first() else {
+            return Some(self.make_string_array(call.span, [value.value.to_string()]));
+        };
+        let Expression::StringLiteral(separator) =
+            self.unwrap_parens(separator_argument.as_expression()?)
+        else {
+            return None;
+        };
+        let text = value.value.as_str();
+        let separator = separator.value.as_str();
+        let parts = if separator.is_empty() {
+            let units: Vec<u16> = text.encode_utf16().take(limit).collect();
+            if units.iter().any(|unit| (0xD800..=0xDFFF).contains(unit)) {
+                return None;
+            }
+            units
+                .into_iter()
+                .map(|unit| char::from_u32(u32::from(unit)).unwrap().to_string())
+                .collect::<Vec<_>>()
+        } else {
+            text.split(separator)
+                .take(limit)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        Some(self.make_string_array(call.span, parts))
+    }
+
+    fn resolve_join(&self, call: &CallExpression<'a>) -> Option<Expression<'a>> {
+        let (object, property) = self.member_object_and_name(call)?;
+        if property != "join" || call.arguments.len() > 1 {
+            return None;
+        }
+        let Expression::ArrayExpression(array) = self.unwrap_parens(object) else {
+            return None;
+        };
+        let separator = match call.arguments.first() {
+            Some(argument) => {
+                let Expression::StringLiteral(separator) =
+                    self.unwrap_parens(argument.as_expression()?)
+                else {
+                    return None;
+                };
+                separator.value.as_str()
+            }
+            None => ",",
+        };
+        let mut values = Vec::with_capacity(array.elements.len());
+        for element in &array.elements {
+            let Expression::StringLiteral(value) = self.unwrap_parens(element.as_expression()?)
+            else {
+                return None;
+            };
+            values.push(value.value.as_str());
+        }
+        Some(self.make_string_literal(call.span, &values.join(separator)))
     }
 
     fn resolve_char_at(&self, call: &CallExpression<'a>) -> Option<Expression<'a>> {
@@ -272,8 +388,10 @@ impl<'a> Visitor<'a> {
             }
             _ => return None,
         };
-        if !matches!(prop, "indexOf" | "lastIndexOf" | "includes" | "startsWith" | "endsWith")
-            || call.arguments.is_empty()
+        if !matches!(
+            prop,
+            "indexOf" | "lastIndexOf" | "includes" | "startsWith" | "endsWith"
+        ) || call.arguments.is_empty()
             || call.arguments.len() > 2
         {
             return None;
@@ -309,10 +427,9 @@ impl<'a> Visitor<'a> {
                 if prop == "includes" {
                     Some(self.make_boolean_literal(call.span, found.is_some()))
                 } else {
-                    Some(self.make_number_literal(
-                        call.span,
-                        found.map_or(-1, |index| index as i64),
-                    ))
+                    Some(
+                        self.make_number_literal(call.span, found.map_or(-1, |index| index as i64)),
+                    )
                 }
             }
             "lastIndexOf" => {
@@ -327,10 +444,7 @@ impl<'a> Visitor<'a> {
                         .rev()
                         .find(|&index| haystack[index..index + needle.len()] == needle)
                 };
-                Some(self.make_number_literal(
-                    call.span,
-                    found.map_or(-1, |index| index as i64),
-                ))
+                Some(self.make_number_literal(call.span, found.map_or(-1, |index| index as i64)))
             }
             "startsWith" => {
                 let start = clamp(supplied_position.unwrap_or(0));
@@ -483,6 +597,8 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
             if let Some(repl) = self
                 .resolve_char_at(call)
                 .or_else(|| self.resolve_char_code_at(call))
+                .or_else(|| self.resolve_split(call))
+                .or_else(|| self.resolve_join(call))
                 .or_else(|| self.resolve_slice(call))
                 .or_else(|| self.resolve_search(call))
                 .or_else(|| self.resolve_concat(call))

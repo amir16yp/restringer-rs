@@ -82,6 +82,7 @@ impl Transform for ResolveMemberExpressionsLocalReferences {
 
         let mut collector = SkipSpanCollector {
             skip_spans: HashSet::new(),
+            mutated_properties: HashSet::new(),
         };
         collector.visit_program(program);
 
@@ -91,6 +92,7 @@ impl Transform for ResolveMemberExpressionsLocalReferences {
             declared_names,
             context_code,
             skip_spans: collector.skip_spans,
+            mutated_properties: collector.mutated_properties,
             modified: false,
         };
         visitor.visit_program(program);
@@ -106,6 +108,7 @@ impl UnsafeTransform for ResolveMemberExpressionsLocalReferences {
 
 struct SkipSpanCollector {
     skip_spans: HashSet<Span>,
+    mutated_properties: HashSet<(String, String)>,
 }
 
 impl<'a> Visit<'a> for SkipSpanCollector {
@@ -133,12 +136,24 @@ impl<'a> Visit<'a> for SkipSpanCollector {
     }
 
     fn visit_assignment_expression(&mut self, it: &AssignmentExpression<'a>) {
-        if matches!(
-            &it.left,
-            AssignmentTarget::StaticMemberExpression(_)
-                | AssignmentTarget::ComputedMemberExpression(_)
-        ) {
-            self.skip_spans.insert(it.left.span());
+        match &it.left {
+            AssignmentTarget::StaticMemberExpression(member) => {
+                self.skip_spans.insert(it.left.span());
+                if let Expression::Identifier(object) = &member.object {
+                    self.mutated_properties
+                        .insert((object.name.to_string(), member.property.name.to_string()));
+                }
+            }
+            AssignmentTarget::ComputedMemberExpression(member) => {
+                self.skip_spans.insert(it.left.span());
+                if let Expression::Identifier(object) = &member.object {
+                    if let Some(property) = computed_property_name(&member.expression) {
+                        self.mutated_properties
+                            .insert((object.name.to_string(), property.to_string()));
+                    }
+                }
+            }
+            _ => {}
         }
         oxc_ast_visit::walk::walk_assignment_expression(self, it);
     }
@@ -150,6 +165,7 @@ struct LocalReferenceVisitor<'a, 'b> {
     declared_names: HashSet<String>,
     context_code: String,
     skip_spans: HashSet<Span>,
+    mutated_properties: HashSet<(String, String)>,
     modified: bool,
 }
 
@@ -181,7 +197,11 @@ impl<'a, 'b> LocalReferenceVisitor<'a, 'b> {
             return;
         }
         if let Some(prop) = prop_name {
-            if super::helpers::SKIP_PROPERTIES.contains(&prop) {
+            if super::helpers::SKIP_PROPERTIES.contains(&prop)
+                || self
+                    .mutated_properties
+                    .contains(&(obj_name.to_string(), prop.to_string()))
+            {
                 return;
             }
         }

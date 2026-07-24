@@ -57,13 +57,8 @@ struct AliasCollector {
 
 impl AliasCollector {
     fn record_assignment_target(&mut self, name: &str) {
-        if self.excluded.contains(name) {
-            return;
-        }
-        if self.assignments.contains_key(name) {
-            self.assignments.remove(name);
-            self.excluded.insert(name.to_string());
-        }
+        self.assignments.remove(name);
+        self.excluded.insert(name.to_string());
     }
 
     fn record_alias(&mut self, name: &str, target: &str) {

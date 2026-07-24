@@ -43,7 +43,38 @@ impl Transform for ResolveLocalCalls {
 
         for stmt in &program.body {
             let code = helpers::statement_to_code(stmt);
-            if code.len() > 5000 || helpers::contains_skip_word(&code) {
+            let is_static_array_declaration = match stmt {
+                Statement::VariableDeclaration(declaration) => {
+                    !declaration.declarations.is_empty()
+                        && declaration.declarations.iter().all(|declarator| {
+                            matches!(
+                                declarator.init.as_ref(),
+                                Some(Expression::ArrayExpression(array))
+                                    if helpers::is_static_literal_array(array)
+                            )
+                        })
+                }
+                _ => false,
+            };
+            let is_function_value_declaration = match stmt {
+                Statement::VariableDeclaration(declaration) => {
+                    declaration.declarations.iter().any(|declarator| {
+                        matches!(
+                            declarator.init.as_ref(),
+                            Some(
+                                Expression::FunctionExpression(_)
+                                    | Expression::ArrowFunctionExpression(_)
+                            )
+                        )
+                    })
+                }
+                _ => false,
+            };
+            if (code.len() > 5_000
+                && !is_static_array_declaration
+                && !is_function_value_declaration)
+                || (helpers::contains_skip_word(&code) && !is_function_value_declaration)
+            {
                 continue;
             }
 
