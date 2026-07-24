@@ -94,6 +94,37 @@ impl<'a> Visitor<'a> {
         out
     }
 
+    fn collect_declared_idents_in_statement_list(&self, stmts: &[Statement<'a>]) -> HashSet<String> {
+        let mut out = HashSet::new();
+        for stmt in stmts {
+            self.collect_declared_idents_in_statement(stmt, &mut out);
+        }
+        out
+    }
+
+    fn collect_declared_idents_in_statement(&self, stmt: &Statement<'a>, out: &mut HashSet<String>) {
+        match stmt {
+            Statement::VariableDeclaration(var_decl) => {
+                for decl in &var_decl.declarations {
+                    if let BindingPattern::BindingIdentifier(id) = &decl.id {
+                        out.insert(id.name.as_str().to_string());
+                    }
+                }
+            }
+            Statement::FunctionDeclaration(func) => {
+                if let Some(id) = &func.id {
+                    out.insert(id.name.as_str().to_string());
+                }
+            }
+            Statement::BlockStatement(block) => {
+                for s in &block.body {
+                    self.collect_declared_idents_in_statement(s, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn collect_modified_idents_in_statement(&self, stmt: &Statement<'a>, out: &mut HashSet<String>) {
         match stmt {
             Statement::ExpressionStatement(es) => self.collect_modified_idents_in_expression(&es.expression, out),
@@ -448,9 +479,11 @@ impl<'a> Visitor<'a> {
     fn load_map_for_statement_list(&mut self, stmts: &[Statement<'a>]) {
         let mut candidates = self.collect_candidates_from_statement_list(stmts);
         let modified_ids = self.collect_modified_idents_in_statement_list(stmts);
+        let declared_ids = self.collect_declared_idents_in_statement_list(stmts);
 
-        // If the object binding itself is modified in this statement list, skip.
-        candidates.retain(|(obj, _), _| !modified_ids.contains(obj));
+        // Only resolve member expressions on objects that are declared local
+        // identifiers in this statement list, and whose binding is not modified.
+        candidates.retain(|(obj, _), _| declared_ids.contains(obj) && !modified_ids.contains(obj));
         self.map = candidates;
     }
 

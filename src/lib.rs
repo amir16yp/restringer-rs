@@ -88,6 +88,7 @@ impl Default for Restringer {
                 Box::new(transforms::unsafe_transforms::ResolveMinimalAlphabet::new()),
                 Box::new(transforms::unsafe_transforms::ResolveDefiniteBinaryExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveAugmentedFunctionWrappedArrayReplacements::new()),
+                Box::new(transforms::unsafe_transforms::ResolveLiteralIifeResults::new()),
                 Box::new(transforms::unsafe_transforms::ResolveMemberExpressionsLocalReferences::new()),
                 Box::new(transforms::unsafe_transforms::ResolveDefiniteMemberExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveBuiltinCalls::new()),

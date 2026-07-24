@@ -17,6 +17,7 @@ pub mod resolve_definite_member_expressions;
 pub mod resolve_deterministic_conditional_expressions;
 pub mod resolve_member_expressions_local_references;
 pub mod resolve_minimal_alphabet;
+pub mod resolve_literal_iife_results;
 
 pub use engine::{Engine, JsEvaluator, set_default_engine};
 pub use unsafe_transform::{UnsafeTransform, UnsafeTransformHelper};
@@ -31,3 +32,4 @@ pub use resolve_definite_member_expressions::ResolveDefiniteMemberExpressions;
 pub use resolve_deterministic_conditional_expressions::ResolveDeterministicConditionalExpressions;
 pub use resolve_member_expressions_local_references::ResolveMemberExpressionsLocalReferences;
 pub use resolve_minimal_alphabet::ResolveMinimalAlphabet;
+pub use resolve_literal_iife_results::ResolveLiteralIifeResults;

@@ -248,3 +248,37 @@ mod resolve_builtin_calls {
         assert_transform("ResolveBuiltinCalls", code, expected, &result);
     }
 }
+
+#[cfg(test)]
+mod ant_regression {
+    use crate::{DeobfuscateOptions, Restringer};
+
+    #[test]
+    fn test_ant_js_does_not_lose_function_body() {
+        let code = include_str!("../../restringer-js/tests/resources/ant.js");
+        let restringer = Restringer::default();
+        let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
+        assert!(result.modified);
+        // The bug caused only the string-array declaration to be emitted.
+        assert!(
+            result.code.contains("function ant_main"),
+            "expected ant_main to remain in deobfuscated output"
+        );
+        assert!(
+            result.code.contains("window.ant_zero"),
+            "expected window property assignments to remain in output"
+        );
+    }
+
+    #[test]
+    fn test_udu_js_resolves_string_array() {
+        let code = include_str!("../../restringer-js/tests/resources/udu.js");
+        let restringer = Restringer::default();
+        let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
+        assert!(result.modified);
+        assert!(
+            !result.code.contains("_$_2b1a["),
+            "expected all string-array references to be resolved"
+        );
+    }
+}

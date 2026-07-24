@@ -35,7 +35,11 @@ impl Transform for ResolveMemberExpressionsLocalReferences {
         let mut declared_names: HashSet<String> = HashSet::new();
         for stmt in &program.body {
             let code = super::helpers::statement_to_code(stmt);
-            if code.len() > 5000 || super::helpers::contains_skip_word(&code) {
+            let is_var_decl = matches!(stmt, Statement::VariableDeclaration(_));
+            // Variable declarations are usually the obfuscated string-array initializer;
+            // skip-word checks on the generated source often produce false positives from
+            // encoded string literals, so we only apply them to function declarations.
+            if !is_var_decl && (super::helpers::contains_skip_word(&code) || code.len() > 5000) {
                 continue;
             }
             match stmt {
@@ -202,7 +206,6 @@ fn is_empty_replacement(expr: &Expression) -> bool {
     match expr {
         Expression::ArrayExpression(arr) => arr.elements.is_empty(),
         Expression::ObjectExpression(obj) => obj.properties.is_empty(),
-        Expression::StringLiteral(s) => s.value.is_empty(),
         Expression::NullLiteral(_) => true,
         _ => false,
     }
