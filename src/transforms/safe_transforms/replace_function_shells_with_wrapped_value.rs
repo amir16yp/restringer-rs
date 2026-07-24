@@ -13,7 +13,10 @@ impl Transform for ReplaceFunctionShellsWithWrappedValue {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -35,7 +38,16 @@ impl<'a> Visitor<'a> {
     }
 
     fn is_returnable(expr: &Expression<'a>) -> bool {
-        matches!(expr, Expression::Identifier(_) | Expression::StringLiteral(_) | Expression::NumericLiteral(_) | Expression::BooleanLiteral(_) | Expression::NullLiteral(_) | Expression::BigIntLiteral(_) | Expression::RegExpLiteral(_))
+        matches!(
+            expr,
+            Expression::Identifier(_)
+                | Expression::StringLiteral(_)
+                | Expression::NumericLiteral(_)
+                | Expression::BooleanLiteral(_)
+                | Expression::NullLiteral(_)
+                | Expression::BigIntLiteral(_)
+                | Expression::RegExpLiteral(_)
+        )
     }
 
     fn return_expr_from_function<'b>(&self, func: &'b Function<'a>) -> Option<&'b Expression<'a>> {
@@ -43,7 +55,9 @@ impl<'a> Visitor<'a> {
         if body.statements.len() != 1 {
             return None;
         }
-        let Statement::ReturnStatement(ret) = &body.statements[0] else { return None; };
+        let Statement::ReturnStatement(ret) = &body.statements[0] else {
+            return None;
+        };
         let arg = ret.argument.as_ref()?;
         if Self::is_returnable(arg) {
             Some(arg)
@@ -54,10 +68,16 @@ impl<'a> Visitor<'a> {
 
     fn replace_calls_in_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
         for stmt in stmts.iter_mut() {
-            let Statement::FunctionDeclaration(func_decl) = stmt else { continue; };
+            let Statement::FunctionDeclaration(func_decl) = stmt else {
+                continue;
+            };
             let func = &**func_decl;
-            let Some(id) = func.id.as_ref() else { continue; };
-            let Some(ret_expr) = self.return_expr_from_function(func) else { continue; };
+            let Some(id) = func.id.as_ref() else {
+                continue;
+            };
+            let Some(ret_expr) = self.return_expr_from_function(func) else {
+                continue;
+            };
 
             let span_name = id.name.as_str();
             let ret_clone = ret_expr.clone_in(self.allocator);
@@ -120,7 +140,12 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        let mut r = Replacer { allocator: self.allocator, func_name, replacement, replaced_any: false };
+        let mut r = Replacer {
+            allocator: self.allocator,
+            func_name,
+            replacement,
+            replaced_any: false,
+        };
         r.visit_statement(stmt);
         r.replaced_any
     }

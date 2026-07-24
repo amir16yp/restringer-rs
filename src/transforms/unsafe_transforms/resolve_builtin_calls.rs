@@ -73,12 +73,10 @@ impl ResolveBuiltinCalls {
                         )
                     }
                     Expression::ArrayExpression(arr) => {
-                        let elements_ok = arr.elements.iter().all(|elem| {
-                            match elem {
-                                ArrayExpressionElement::SpreadElement(_) => false,
-                                ArrayExpressionElement::Elision(_) => true,
-                                _ => helpers::is_static_literal(elem.to_expression()),
-                            }
+                        let elements_ok = arr.elements.iter().all(|elem| match elem {
+                            ArrayExpressionElement::SpreadElement(_) => false,
+                            ArrayExpressionElement::Elision(_) => true,
+                            _ => helpers::is_static_literal(elem.to_expression()),
                         });
                         elements_ok && matches!(prop_name, "join" | "slice" | "concat" | "indexOf")
                     }
@@ -134,7 +132,9 @@ impl<'a, 'b> VisitMut<'a> for BuiltinVisitor<'a, 'b> {
                 if !call_code.is_empty() {
                     let full_code = format!("{};\n{}", helpers::EVAL_PRELUDE, call_code);
                     if let Ok(json_res) = self.transform.evaluator.eval_to_json(&full_code) {
-                        if let Some(new_expr) = helpers::parse_expression_in(self.allocator, &json_res, expr.span()) {
+                        if let Some(new_expr) =
+                            helpers::parse_expression_in(self.allocator, &json_res, expr.span())
+                        {
                             *expr = new_expr;
                             self.modified = true;
                         }

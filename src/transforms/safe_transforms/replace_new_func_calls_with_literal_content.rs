@@ -16,7 +16,11 @@ impl Transform for ReplaceNewFuncCallsWithLiteralContent {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, source_type: ctx.source_type, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            source_type: ctx.source_type,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -45,7 +49,9 @@ impl<'a> Visitor<'a> {
     }
 
     fn is_target_new_function(&self, new_expr: &NewExpression<'a>) -> bool {
-        let Expression::Identifier(id) = self.unwrap_parens(&new_expr.callee) else { return false; };
+        let Expression::Identifier(id) = self.unwrap_parens(&new_expr.callee) else {
+            return false;
+        };
         id.name.as_str() == "Function"
     }
 
@@ -60,21 +66,27 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn parse_code_string_to_ast(&self, span: oxc_span::Span, code: &str) -> Option<Replacement<'a>> {
+    fn parse_code_string_to_ast(
+        &self,
+        span: oxc_span::Span,
+        code: &str,
+    ) -> Option<Replacement<'a>> {
         // JS version returns a literal node for empty strings.
         // Here we represent it as a string literal expression.
         if code.is_empty() {
             let s = self.allocator.alloc_str(code);
-            return Some(Replacement::Expr(Expression::StringLiteral(ArenaBox::new_in(
-                StringLiteral {
-                    node_id: Cell::new(NodeId::DUMMY),
-                    span,
-                    value: s.into(),
-                    raw: None,
-                    lone_surrogates: false,
-                },
-                self.allocator,
-            ))));
+            return Some(Replacement::Expr(Expression::StringLiteral(
+                ArenaBox::new_in(
+                    StringLiteral {
+                        node_id: Cell::new(NodeId::DUMMY),
+                        span,
+                        value: s.into(),
+                        raw: None,
+                        lone_surrogates: false,
+                    },
+                    self.allocator,
+                ),
+            )));
         }
 
         // The string passed to `new Function(code)` is the function body.
@@ -86,7 +98,10 @@ impl<'a> Visitor<'a> {
 
         let temp_allocator = Allocator::default();
         let parse_ret = Parser::new(&temp_allocator, &wrapped, self.source_type)
-            .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
+            .with_options(ParseOptions {
+                parse_regular_expression: true,
+                ..ParseOptions::default()
+            })
             .parse();
         if !parse_ret.errors.is_empty() {
             return None;
@@ -117,12 +132,19 @@ impl<'a> Visitor<'a> {
             for s in body.iter() {
                 out.push(s.clone_in(self.allocator));
             }
-            return Some(Replacement::Block(BlockStatement { node_id: Cell::new(NodeId::DUMMY), span, body: out, scope_id: Default::default() }));
+            return Some(Replacement::Block(BlockStatement {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                body: out,
+                scope_id: Default::default(),
+            }));
         }
 
         let stmt = &body[0];
         match stmt {
-            Statement::ExpressionStatement(es) => Some(Replacement::Expr(es.expression.clone_in(self.allocator))),
+            Statement::ExpressionStatement(es) => {
+                Some(Replacement::Expr(es.expression.clone_in(self.allocator)))
+            }
             Statement::ReturnStatement(rs) => {
                 let arg = rs.argument.as_ref()?;
                 Some(Replacement::Expr(arg.clone_in(self.allocator)))
@@ -136,7 +158,9 @@ impl<'a> Visitor<'a> {
             return None;
         }
 
-        let Expression::NewExpression(new_expr) = self.unwrap_parens(&call.callee) else { return None; };
+        let Expression::NewExpression(new_expr) = self.unwrap_parens(&call.callee) else {
+            return None;
+        };
         if !self.is_target_new_function(new_expr) {
             return None;
         }
@@ -164,7 +188,8 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
                             return;
                         }
                         Replacement::Block(block) => {
-                            *it = Statement::BlockStatement(ArenaBox::new_in(block, self.allocator));
+                            *it =
+                                Statement::BlockStatement(ArenaBox::new_in(block, self.allocator));
                             self.modified = true;
                             return;
                         }

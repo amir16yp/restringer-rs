@@ -62,23 +62,23 @@ impl<'a, 'b> EvalVisitor<'a, 'b> {
             | Expression::StringLiteral(_)
             | Expression::BooleanLiteral(_)
             | Expression::NullLiteral(_) => false,
-            
+
             Expression::ArrayExpression(_) | Expression::ObjectExpression(_) => false,
-            
+
             Expression::ParenthesizedExpression(paren) => {
                 self.is_safe_to_eval_recursive(&paren.expression)
             }
-            
-            Expression::UnaryExpression(un) => {
-                self.is_safe_to_eval_recursive(&un.argument)
-            }
+
+            Expression::UnaryExpression(un) => self.is_safe_to_eval_recursive(&un.argument),
 
             Expression::BinaryExpression(bin) => {
-                self.is_safe_to_eval_recursive(&bin.left) && self.is_safe_to_eval_recursive(&bin.right)
+                self.is_safe_to_eval_recursive(&bin.left)
+                    && self.is_safe_to_eval_recursive(&bin.right)
             }
 
             Expression::LogicalExpression(log) => {
-                self.is_safe_to_eval_recursive(&log.left) && self.is_safe_to_eval_recursive(&log.right)
+                self.is_safe_to_eval_recursive(&log.left)
+                    && self.is_safe_to_eval_recursive(&log.right)
             }
 
             Expression::ConditionalExpression(cond) => {
@@ -87,9 +87,10 @@ impl<'a, 'b> EvalVisitor<'a, 'b> {
                     && self.is_safe_to_eval_recursive(&cond.alternate)
             }
 
-            Expression::TemplateLiteral(tmpl) => {
-                tmpl.expressions.iter().all(|e| self.is_safe_to_eval_recursive(e))
-            }
+            Expression::TemplateLiteral(tmpl) => tmpl
+                .expressions
+                .iter()
+                .all(|e| self.is_safe_to_eval_recursive(e)),
 
             _ => false,
         }
@@ -103,56 +104,46 @@ impl<'a, 'b> EvalVisitor<'a, 'b> {
             | Expression::BigIntLiteral(_)
             | Expression::NullLiteral(_)
             | Expression::RegExpLiteral(_) => true,
-            Expression::ArrayExpression(arr) => {
-                arr.elements.iter().all(|elem| match elem {
-                    ArrayExpressionElement::SpreadElement(_) => false,
-                    ArrayExpressionElement::Elision(_) => true,
-                    _ => self.is_safe_to_eval_recursive(elem.to_expression()),
-                })
-            }
-            Expression::ObjectExpression(obj) => {
-                obj.properties.iter().all(|prop| match prop {
-                    ObjectPropertyKind::ObjectProperty(p) => {
-                        let key_safe = match &p.key {
-                            PropertyKey::StaticIdentifier(_) => true,
-                            PropertyKey::PrivateIdentifier(_) => false,
-                            PropertyKey::NullLiteral(_)
-                            | PropertyKey::NumericLiteral(_)
-                            | PropertyKey::StringLiteral(_)
-                            | PropertyKey::RegExpLiteral(_)
-                            | PropertyKey::BigIntLiteral(_)
-                            | PropertyKey::TemplateLiteral(_) => true,
-                            _ => false,
-                        };
-                        key_safe && self.is_safe_to_eval_recursive(&p.value)
-                    }
-                    ObjectPropertyKind::SpreadProperty(_) => false,
-                })
-            }
-            Expression::StaticMemberExpression(m) => {
-                self.is_pure_literal_base(&m.object)
-            }
+            Expression::ArrayExpression(arr) => arr.elements.iter().all(|elem| match elem {
+                ArrayExpressionElement::SpreadElement(_) => false,
+                ArrayExpressionElement::Elision(_) => true,
+                _ => self.is_safe_to_eval_recursive(elem.to_expression()),
+            }),
+            Expression::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
+                ObjectPropertyKind::ObjectProperty(p) => {
+                    let key_safe = match &p.key {
+                        PropertyKey::StaticIdentifier(_) => true,
+                        PropertyKey::PrivateIdentifier(_) => false,
+                        PropertyKey::NullLiteral(_)
+                        | PropertyKey::NumericLiteral(_)
+                        | PropertyKey::StringLiteral(_)
+                        | PropertyKey::RegExpLiteral(_)
+                        | PropertyKey::BigIntLiteral(_)
+                        | PropertyKey::TemplateLiteral(_) => true,
+                        _ => false,
+                    };
+                    key_safe && self.is_safe_to_eval_recursive(&p.value)
+                }
+                ObjectPropertyKind::SpreadProperty(_) => false,
+            }),
+            Expression::StaticMemberExpression(m) => self.is_pure_literal_base(&m.object),
             Expression::ComputedMemberExpression(m) => {
-                self.is_pure_literal_base(&m.object) && self.is_safe_to_eval_recursive(&m.expression)
+                self.is_pure_literal_base(&m.object)
+                    && self.is_safe_to_eval_recursive(&m.expression)
             }
-            Expression::ParenthesizedExpression(p) => {
-                self.is_pure_literal_base(&p.expression)
-            }
+            Expression::ParenthesizedExpression(p) => self.is_pure_literal_base(&p.expression),
             _ => false,
         }
     }
 
     fn is_safe_call_callee(&self, expr: &Expression<'a>) -> bool {
         match expr {
-            Expression::StaticMemberExpression(m) => {
-                self.is_pure_literal_base(&m.object)
-            }
+            Expression::StaticMemberExpression(m) => self.is_pure_literal_base(&m.object),
             Expression::ComputedMemberExpression(m) => {
-                self.is_pure_literal_base(&m.object) && self.is_safe_to_eval_recursive(&m.expression)
+                self.is_pure_literal_base(&m.object)
+                    && self.is_safe_to_eval_recursive(&m.expression)
             }
-            Expression::ParenthesizedExpression(p) => {
-                self.is_safe_call_callee(&p.expression)
-            }
+            Expression::ParenthesizedExpression(p) => self.is_safe_call_callee(&p.expression),
             _ => false,
         }
     }
@@ -163,53 +154,42 @@ impl<'a, 'b> EvalVisitor<'a, 'b> {
             | Expression::StringLiteral(_)
             | Expression::BooleanLiteral(_)
             | Expression::NullLiteral(_) => true,
-            
+
             Expression::ParenthesizedExpression(paren) => {
                 self.is_safe_to_eval_recursive(&paren.expression)
             }
-            
-            Expression::ArrayExpression(arr) => {
-                arr.elements.iter().all(|elem| {
-                    match elem {
-                        ArrayExpressionElement::SpreadElement(_) => false,
-                        ArrayExpressionElement::Elision(_) => true,
-                        _ => self.is_safe_to_eval_recursive(elem.to_expression()),
-                    }
-                })
-            }
-            
-            Expression::ObjectExpression(obj) => {
-                obj.properties.iter().all(|prop| {
-                    match prop {
-                        ObjectPropertyKind::ObjectProperty(p) => {
-                            let key_safe = match &p.key {
-                                PropertyKey::StaticIdentifier(_) => true,
-                                PropertyKey::PrivateIdentifier(_) => false,
-                                PropertyKey::NullLiteral(_)
-                                | PropertyKey::NumericLiteral(_)
-                                | PropertyKey::StringLiteral(_)
-                                | PropertyKey::RegExpLiteral(_)
-                                | PropertyKey::BigIntLiteral(_)
-                                | PropertyKey::TemplateLiteral(_) => true,
-                                _ => false,
-                            };
-                            key_safe && self.is_safe_to_eval_recursive(&p.value)
-                        }
-                        ObjectPropertyKind::SpreadProperty(_) => false,
-                    }
-                })
-            }
-            
-            Expression::UnaryExpression(un) => {
-                self.is_safe_to_eval_recursive(&un.argument)
-            }
 
-            Expression::StaticMemberExpression(m) => {
-                self.is_pure_literal_base(&m.object)
-            }
+            Expression::ArrayExpression(arr) => arr.elements.iter().all(|elem| match elem {
+                ArrayExpressionElement::SpreadElement(_) => false,
+                ArrayExpressionElement::Elision(_) => true,
+                _ => self.is_safe_to_eval_recursive(elem.to_expression()),
+            }),
+
+            Expression::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
+                ObjectPropertyKind::ObjectProperty(p) => {
+                    let key_safe = match &p.key {
+                        PropertyKey::StaticIdentifier(_) => true,
+                        PropertyKey::PrivateIdentifier(_) => false,
+                        PropertyKey::NullLiteral(_)
+                        | PropertyKey::NumericLiteral(_)
+                        | PropertyKey::StringLiteral(_)
+                        | PropertyKey::RegExpLiteral(_)
+                        | PropertyKey::BigIntLiteral(_)
+                        | PropertyKey::TemplateLiteral(_) => true,
+                        _ => false,
+                    };
+                    key_safe && self.is_safe_to_eval_recursive(&p.value)
+                }
+                ObjectPropertyKind::SpreadProperty(_) => false,
+            }),
+
+            Expression::UnaryExpression(un) => self.is_safe_to_eval_recursive(&un.argument),
+
+            Expression::StaticMemberExpression(m) => self.is_pure_literal_base(&m.object),
 
             Expression::ComputedMemberExpression(m) => {
-                self.is_pure_literal_base(&m.object) && self.is_safe_to_eval_recursive(&m.expression)
+                self.is_pure_literal_base(&m.object)
+                    && self.is_safe_to_eval_recursive(&m.expression)
             }
 
             Expression::CallExpression(call) => {
@@ -221,23 +201,26 @@ impl<'a, 'b> EvalVisitor<'a, 'b> {
             }
 
             Expression::BinaryExpression(bin) => {
-                self.is_safe_to_eval_recursive(&bin.left) && self.is_safe_to_eval_recursive(&bin.right)
+                self.is_safe_to_eval_recursive(&bin.left)
+                    && self.is_safe_to_eval_recursive(&bin.right)
             }
-            
+
             Expression::LogicalExpression(log) => {
-                self.is_safe_to_eval_recursive(&log.left) && self.is_safe_to_eval_recursive(&log.right)
+                self.is_safe_to_eval_recursive(&log.left)
+                    && self.is_safe_to_eval_recursive(&log.right)
             }
-            
+
             Expression::ConditionalExpression(cond) => {
                 self.is_safe_to_eval_recursive(&cond.test)
                     && self.is_safe_to_eval_recursive(&cond.consequent)
                     && self.is_safe_to_eval_recursive(&cond.alternate)
             }
-            
-            Expression::TemplateLiteral(tmpl) => {
-                tmpl.expressions.iter().all(|e| self.is_safe_to_eval_recursive(e))
-            }
-            
+
+            Expression::TemplateLiteral(tmpl) => tmpl
+                .expressions
+                .iter()
+                .all(|e| self.is_safe_to_eval_recursive(e)),
+
             _ => false,
         }
     }

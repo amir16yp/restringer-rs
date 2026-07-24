@@ -17,7 +17,11 @@ impl Transform for ResolveProxyVariables {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, map: HashMap::new(), modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            map: HashMap::new(),
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -33,7 +37,9 @@ struct Visitor<'a> {
 impl<'a> Visitor<'a> {
     fn collect_proxy_declarators_from_statement_list(&mut self, stmts: &[Statement<'a>]) {
         for stmt in stmts {
-            let Statement::VariableDeclaration(var_decl) = stmt else { continue; };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                continue;
+            };
 
             // Be conservative: only treat `const proxy = target;` as an alias.
             // `var`/`let` are often used in polyfills and can be reassigned; rewriting them can break semantics.
@@ -41,9 +47,15 @@ impl<'a> Visitor<'a> {
                 continue;
             }
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue; };
-                let Some(init) = decl.init.as_ref() else { continue; };
-                let Expression::Identifier(target) = init else { continue; };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
+                let Some(init) = decl.init.as_ref() else {
+                    continue;
+                };
+                let Expression::Identifier(target) = init else {
+                    continue;
+                };
 
                 let proxy_name = binding.name.as_str();
                 let target_name = target.name.as_str();
@@ -51,7 +63,8 @@ impl<'a> Visitor<'a> {
                     continue;
                 }
                 if proxy_name != target_name {
-                    self.map.insert(proxy_name.to_string(), target_name.to_string());
+                    self.map
+                        .insert(proxy_name.to_string(), target_name.to_string());
                 }
             }
         }
@@ -60,7 +73,12 @@ impl<'a> Visitor<'a> {
     fn make_ident_expr(&self, span: oxc_span::Span, name: &str) -> Expression<'a> {
         let name = self.allocator.alloc_str(name);
         Expression::Identifier(ArenaBox::new_in(
-            IdentifierReference { node_id: Cell::new(NodeId::DUMMY), span, name: name.into(), reference_id: None.into() },
+            IdentifierReference {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                name: name.into(),
+                reference_id: None.into(),
+            },
             self.allocator,
         ))
     }
@@ -216,7 +234,10 @@ impl<'a> Visitor<'a> {
 
                     let mut new_decl = (*var_decl).clone_in(self.allocator);
                     new_decl.declarations = kept;
-                    out.push(Statement::VariableDeclaration(oxc_allocator::Box::new_in(new_decl, self.allocator)));
+                    out.push(Statement::VariableDeclaration(oxc_allocator::Box::new_in(
+                        new_decl,
+                        self.allocator,
+                    )));
                 }
                 other => {
                     // Keep the original statement without cloning the AST.

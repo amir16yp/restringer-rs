@@ -12,10 +12,13 @@ use std::time::Duration;
 use clap::{ArgGroup, Parser as ClapParser};
 use oxc_span::SourceType;
 
-use restringer_rs::{set_default_engine, DeobfuscateOptions, Engine, Restringer};
+use restringer_rs::{DeobfuscateOptions, Engine, Restringer, set_default_engine};
 
 #[derive(Debug, ClapParser)]
-#[command(name = "restringer", about = "REstringer - a JavaScript deobfuscator (Rust rewrite)")]
+#[command(
+    name = "restringer",
+    about = "REstringer - a JavaScript deobfuscator (Rust rewrite)"
+)]
 #[command(group(
     ArgGroup::new("verbosity")
         .args(["quiet", "verbose"])
@@ -97,7 +100,10 @@ fn main() {
     let source_text = match read_file_to_string_with_capacity(&input_path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("[-] Critical Error: Failed to read {}: {e}", input_path.display());
+            eprintln!(
+                "[-] Critical Error: Failed to read {}: {e}",
+                input_path.display()
+            );
             process::exit(1);
         }
     };
@@ -165,7 +171,10 @@ fn main() {
 
     if output_to_file {
         if let Err(e) = fs::write(&output_path, output_text.as_bytes()) {
-            eprintln!("[-] Critical Error: Failed to write {}: {e}", output_path.display());
+            eprintln!(
+                "[-] Critical Error: Failed to write {}: {e}",
+                output_path.display()
+            );
             process::exit(1);
         }
         if !cli.quiet {
@@ -178,7 +187,11 @@ fn main() {
 
 fn read_file_to_string_with_capacity(path: &Path) -> std::io::Result<String> {
     let mut file = fs::File::open(path)?;
-    let cap = file.metadata().ok().and_then(|m| usize::try_from(m.len()).ok()).unwrap_or(0);
+    let cap = file
+        .metadata()
+        .ok()
+        .and_then(|m| usize::try_from(m.len()).ok())
+        .unwrap_or(0);
     let mut s = String::with_capacity(cap.saturating_add(1));
     file.read_to_string(&mut s)?;
     Ok(s)

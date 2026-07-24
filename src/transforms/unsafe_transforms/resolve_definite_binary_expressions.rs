@@ -12,7 +12,9 @@ pub struct ResolveDefiniteBinaryExpressions {
 
 impl ResolveDefiniteBinaryExpressions {
     pub fn new() -> Self {
-        Self { evaluator: JsEvaluator::new() }
+        Self {
+            evaluator: JsEvaluator::new(),
+        }
     }
 }
 
@@ -62,7 +64,9 @@ impl<'a, 'b> VisitMut<'a> for DefiniteBinaryVisitor<'a, 'b> {
                 };
                 match self.transform.evaluator().eval_to_json(&code) {
                     Ok(json) => {
-                        if let Some(new_expr) = super::helpers::parse_expression_in(self.allocator, &json, expr.span()) {
+                        if let Some(new_expr) =
+                            super::helpers::parse_expression_in(self.allocator, &json, expr.span())
+                        {
                             *expr = new_expr;
                             self.modified = true;
                         }
@@ -76,9 +80,13 @@ impl<'a, 'b> VisitMut<'a> for DefiniteBinaryVisitor<'a, 'b> {
 
 fn contains_only_literals(expr: &Expression) -> bool {
     match expr {
-        Expression::BinaryExpression(bin) => contains_only_literals(&bin.left) && contains_only_literals(&bin.right),
+        Expression::BinaryExpression(bin) => {
+            contains_only_literals(&bin.left) && contains_only_literals(&bin.right)
+        }
         Expression::UnaryExpression(un) => contains_only_literals(&un.argument),
-        Expression::LogicalExpression(log) => contains_only_literals(&log.left) && contains_only_literals(&log.right),
+        Expression::LogicalExpression(log) => {
+            contains_only_literals(&log.left) && contains_only_literals(&log.right)
+        }
         Expression::ConditionalExpression(cond) => {
             contains_only_literals(&cond.test)
                 && contains_only_literals(&cond.consequent)

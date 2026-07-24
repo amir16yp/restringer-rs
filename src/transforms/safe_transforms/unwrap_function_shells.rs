@@ -13,7 +13,10 @@ impl Transform for UnwrapFunctionShells {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -55,15 +58,23 @@ impl<'a> Visitor<'a> {
             return false;
         }
 
-        let Statement::ReturnStatement(ret) = &body.statements[0] else { return false; };
-        let Some(arg) = ret.argument.as_ref() else { return false; };
-        let Expression::CallExpression(call) = arg else { return false; };
+        let Statement::ReturnStatement(ret) = &body.statements[0] else {
+            return false;
+        };
+        let Some(arg) = ret.argument.as_ref() else {
+            return false;
+        };
+        let Expression::CallExpression(call) = arg else {
+            return false;
+        };
 
         if call.arguments.len() != 2 {
             return false;
         }
 
-        let Some(mem) = call.callee.as_member_expression() else { return false; };
+        let Some(mem) = call.callee.as_member_expression() else {
+            return false;
+        };
         if !self.is_apply_property(mem) {
             return false;
         }

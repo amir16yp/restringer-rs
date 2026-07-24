@@ -14,7 +14,9 @@ pub struct ResolveInjectedPrototypeMethodCalls {
 
 impl ResolveInjectedPrototypeMethodCalls {
     pub fn new() -> Self {
-        Self { evaluator: JsEvaluator::new() }
+        Self {
+            evaluator: JsEvaluator::new(),
+        }
     }
 }
 
@@ -31,14 +33,23 @@ impl Transform for ResolveInjectedPrototypeMethodCalls {
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
         // Collect prototype method assignments.
-        let mut prototypes: HashMap<String, (String /* type name */, String /* assignment source */)> = HashMap::new();
+        let mut prototypes: HashMap<
+            String,
+            (
+                String, /* type name */
+                String, /* assignment source */
+            ),
+        > = HashMap::new();
         for stmt in &program.body {
             if let Statement::ExpressionStatement(es) = stmt {
                 if let Expression::AssignmentExpression(assign) = &es.expression {
-                    if let Some((type_name, method_name)) = extract_prototype_assignment(&assign.left) {
+                    if let Some((type_name, method_name)) =
+                        extract_prototype_assignment(&assign.left)
+                    {
                         if is_valid_prototype_value(&assign.right) {
                             let code = super::helpers::statement_to_code(stmt);
-                            prototypes.insert(method_name.to_string(), (type_name.to_string(), code));
+                            prototypes
+                                .insert(method_name.to_string(), (type_name.to_string(), code));
                         }
                     }
                 }
@@ -49,7 +60,11 @@ impl Transform for ResolveInjectedPrototypeMethodCalls {
             return false;
         }
 
-        let context: String = prototypes.values().map(|(_, code)| code.as_str()).collect::<Vec<_>>().join("\n");
+        let context: String = prototypes
+            .values()
+            .map(|(_, code)| code.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let mut visitor = InjectedMethodVisitor {
             allocator: ctx.allocator,
@@ -69,7 +84,9 @@ impl UnsafeTransform for ResolveInjectedPrototypeMethodCalls {
     }
 }
 
-fn extract_prototype_assignment<'b>(target: &'b AssignmentTarget<'b>) -> Option<(&'b str, &'b str)> {
+fn extract_prototype_assignment<'b>(
+    target: &'b AssignmentTarget<'b>,
+) -> Option<(&'b str, &'b str)> {
     match target {
         AssignmentTarget::StaticMemberExpression(s) => extract_prototype_assignment_static(s),
         AssignmentTarget::ComputedMemberExpression(c) => {
@@ -82,7 +99,9 @@ fn extract_prototype_assignment<'b>(target: &'b AssignmentTarget<'b>) -> Option<
     }
 }
 
-fn extract_prototype_assignment_static<'b>(mem: &'b StaticMemberExpression<'b>) -> Option<(&'b str, &'b str)> {
+fn extract_prototype_assignment_static<'b>(
+    mem: &'b StaticMemberExpression<'b>,
+) -> Option<(&'b str, &'b str)> {
     let outer = match &mem.object {
         Expression::StaticMemberExpression(s) => s,
         _ => return None,
@@ -97,7 +116,9 @@ fn extract_prototype_assignment_static<'b>(mem: &'b StaticMemberExpression<'b>) 
     Some((type_name, mem.property.name.as_str()))
 }
 
-fn extract_prototype_assignment_computed<'b>(mem: &'b ComputedMemberExpression<'b>) -> Option<(&'b str, &'b str)> {
+fn extract_prototype_assignment_computed<'b>(
+    mem: &'b ComputedMemberExpression<'b>,
+) -> Option<(&'b str, &'b str)> {
     let outer = match &mem.object {
         Expression::StaticMemberExpression(s) => s,
         _ => return None,
@@ -119,7 +140,9 @@ fn extract_prototype_assignment_computed<'b>(mem: &'b ComputedMemberExpression<'
 fn is_valid_prototype_value(expr: &Expression) -> bool {
     matches!(
         expr,
-        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_) | Expression::Identifier(_)
+        Expression::FunctionExpression(_)
+            | Expression::ArrowFunctionExpression(_)
+            | Expression::Identifier(_)
     )
 }
 
@@ -157,8 +180,12 @@ impl<'a, 'b> InjectedMethodVisitor<'a, 'b> {
             _ => return,
         };
 
-        let Some(object_type) = literal_type_name(object) else { return };
-        let Some((proto_type, _assignment_code)) = self.prototypes.get(prop_name) else { return };
+        let Some(object_type) = literal_type_name(object) else {
+            return;
+        };
+        let Some((proto_type, _assignment_code)) = self.prototypes.get(prop_name) else {
+            return;
+        };
         if proto_type != object_type {
             return;
         }
@@ -171,7 +198,9 @@ impl<'a, 'b> InjectedMethodVisitor<'a, 'b> {
         let full_code = format!("{};\n{}", self.context, call_code);
         match self.transform.evaluator().eval_to_json(&full_code) {
             Ok(json) => {
-                if let Some(new_expr) = super::helpers::parse_expression_in(self.allocator, &json, expr.span()) {
+                if let Some(new_expr) =
+                    super::helpers::parse_expression_in(self.allocator, &json, expr.span())
+                {
                     *expr = new_expr;
                     self.modified = true;
                 }

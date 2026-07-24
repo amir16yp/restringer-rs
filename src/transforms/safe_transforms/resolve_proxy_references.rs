@@ -15,7 +15,11 @@ impl Transform for ResolveProxyReferences {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, map: HashMap::new(), modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            map: HashMap::new(),
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -30,15 +34,21 @@ struct Visitor<'a> {
 impl<'a> Visitor<'a> {
     fn collect_proxy_declarators_from_statement_list(&mut self, stmts: &[Statement<'a>]) {
         for stmt in stmts {
-            let Statement::VariableDeclaration(var_decl) = stmt else { continue };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                continue;
+            };
 
             if var_decl.kind != VariableDeclarationKind::Const {
                 continue;
             }
 
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue };
-                let Some(init) = decl.init.as_ref() else { continue };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
+                let Some(init) = decl.init.as_ref() else {
+                    continue;
+                };
 
                 // Support Identifier and MemberExpressions (static/computed).
                 if !matches!(
@@ -51,7 +61,8 @@ impl<'a> Visitor<'a> {
                 }
 
                 let proxy_name = binding.name.as_str();
-                self.map.insert(proxy_name.to_string(), init.clone_in(self.allocator));
+                self.map
+                    .insert(proxy_name.to_string(), init.clone_in(self.allocator));
             }
         }
     }

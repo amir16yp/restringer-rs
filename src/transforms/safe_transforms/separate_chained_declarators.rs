@@ -12,7 +12,10 @@ impl Transform for SeparateChainedDeclarators {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -24,7 +27,11 @@ struct Visitor<'a> {
 }
 
 impl<'a> Visitor<'a> {
-    fn split_var_decl_stmt(&mut self, decl: &VariableDeclaration<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+    fn split_var_decl_stmt(
+        &mut self,
+        decl: &VariableDeclaration<'a>,
+        out: &mut ArenaVec<'a, Statement<'a>>,
+    ) {
         if decl.declarations.len() <= 1 {
             out.push(Statement::VariableDeclaration(ArenaBox::new_in(
                 decl.clone_in(self.allocator),
@@ -38,7 +45,10 @@ impl<'a> Visitor<'a> {
             let mut one = decl.clone_in(self.allocator);
             one.declarations = ArenaVec::new_in(self.allocator);
             one.declarations.push(d.clone_in(self.allocator));
-            out.push(Statement::VariableDeclaration(ArenaBox::new_in(one, self.allocator)));
+            out.push(Statement::VariableDeclaration(ArenaBox::new_in(
+                one,
+                self.allocator,
+            )));
         }
     }
 }

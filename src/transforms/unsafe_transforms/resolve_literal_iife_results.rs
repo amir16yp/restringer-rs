@@ -41,7 +41,9 @@ impl Transform for ResolveLiteralIifeResults {
                     if is_literal_iife(init) {
                         let code = helpers::expression_to_code(init);
                         if let Ok(json) = self.evaluator.eval_to_json(&code) {
-                            if let Some(expr) = helpers::parse_expression_in(ctx.allocator, &json, init.span()) {
+                            if let Some(expr) =
+                                helpers::parse_expression_in(ctx.allocator, &json, init.span())
+                            {
                                 replacement = Some(expr);
                             }
                         }
@@ -76,12 +78,17 @@ fn is_literal_iife(expr: &Expression) -> bool {
         callee = &paren.expression;
     }
 
-    if !matches!(callee, Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)) {
+    if !matches!(
+        callee,
+        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
+    ) {
         return false;
     }
 
     call.arguments.iter().all(|arg| {
-        let Some(expr) = arg.as_expression() else { return false };
+        let Some(expr) = arg.as_expression() else {
+            return false;
+        };
         is_static_literal(expr)
     })
 }

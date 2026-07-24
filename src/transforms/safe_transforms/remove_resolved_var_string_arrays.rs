@@ -18,14 +18,22 @@ impl Transform for RemoveResolvedVarStringArrays {
         let mut candidates = HashSet::new();
 
         for stmt in &program.body {
-            let Statement::VariableDeclaration(var_decl) = stmt else { continue };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                continue;
+            };
             if var_decl.kind != VariableDeclarationKind::Var {
                 continue;
             }
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue };
-                let Some(init) = decl.init.as_ref() else { continue };
-                let Expression::ArrayExpression(arr) = init else { continue };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
+                let Some(init) = decl.init.as_ref() else {
+                    continue;
+                };
+                let Expression::ArrayExpression(arr) = init else {
+                    continue;
+                };
                 if arr.elements.len() <= MIN_ARRAY_LENGTH {
                     continue;
                 }
@@ -57,12 +65,16 @@ impl Transform for RemoveResolvedVarStringArrays {
 
         let mut modified = false;
         program.body.retain(|stmt| {
-            let Statement::VariableDeclaration(var_decl) = stmt else { return true };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                return true;
+            };
             if var_decl.kind != VariableDeclarationKind::Var {
                 return true;
             }
             let all_removable = var_decl.declarations.iter().all(|decl| {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { return false };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    return false;
+                };
                 to_remove.contains(binding.name.as_str())
             });
             if all_removable {

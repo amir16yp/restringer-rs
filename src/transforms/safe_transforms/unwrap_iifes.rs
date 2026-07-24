@@ -12,7 +12,10 @@ impl Transform for UnwrapIIFEs {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -60,7 +63,9 @@ impl<'a> Visitor<'a> {
                 if body.statements.len() != 1 {
                     return None;
                 }
-                let Statement::ReturnStatement(ret) = &body.statements[0] else { return None; };
+                let Statement::ReturnStatement(ret) = &body.statements[0] else {
+                    return None;
+                };
                 ret.argument.as_ref().map(|e| e.clone_in(self.allocator))
             }
             Expression::FunctionExpression(func) => {
@@ -68,14 +73,19 @@ impl<'a> Visitor<'a> {
                 if body.statements.len() != 1 {
                     return None;
                 }
-                let Statement::ReturnStatement(ret) = &body.statements[0] else { return None; };
+                let Statement::ReturnStatement(ret) = &body.statements[0] else {
+                    return None;
+                };
                 ret.argument.as_ref().map(|e| e.clone_in(self.allocator))
             }
             _ => None,
         }
     }
 
-    fn iife_statement_body(&self, call: &CallExpression<'a>) -> Option<ArenaVec<'a, Statement<'a>>> {
+    fn iife_statement_body(
+        &self,
+        call: &CallExpression<'a>,
+    ) -> Option<ArenaVec<'a, Statement<'a>>> {
         if !self.is_anonymous_iife(call) {
             return None;
         }
@@ -87,7 +97,11 @@ impl<'a> Visitor<'a> {
         };
 
         // Avoid introducing illegal `return` statements into surrounding statement list.
-        if body.statements.iter().any(|s| matches!(s, Statement::ReturnStatement(_))) {
+        if body
+            .statements
+            .iter()
+            .any(|s| matches!(s, Statement::ReturnStatement(_)))
+        {
             return None;
         }
 
@@ -120,7 +134,8 @@ impl<'a> Visitor<'a> {
         for stmt in original {
             let mut replaced = false;
             if let Statement::ExpressionStatement(expr_stmt) = &stmt {
-                if let Expression::CallExpression(call) = self.unwrap_parens(&expr_stmt.expression) {
+                if let Expression::CallExpression(call) = self.unwrap_parens(&expr_stmt.expression)
+                {
                     if let Some(body) = self.iife_statement_body(call) {
                         for s in body {
                             out.push(s);

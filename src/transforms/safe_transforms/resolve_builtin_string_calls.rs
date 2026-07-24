@@ -4,8 +4,8 @@ use oxc_allocator::Box as ArenaBox;
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
 use oxc_span::Span;
-use oxc_syntax::operator::UnaryOperator;
 use oxc_syntax::node::NodeId;
+use oxc_syntax::operator::UnaryOperator;
 
 use crate::{Transform, TransformCtx};
 
@@ -17,7 +17,10 @@ impl Transform for ResolveBuiltinStringCalls {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -53,7 +56,9 @@ impl<'a> Visitor<'a> {
             }
             Expression::UnaryExpression(un) => {
                 let inner = self.unwrap_parens(&un.argument);
-                let Expression::NumericLiteral(n) = inner else { return None };
+                let Expression::NumericLiteral(n) = inner else {
+                    return None;
+                };
                 let v = n.value;
                 if !v.is_finite() || v.fract() != 0.0 {
                     return None;
@@ -103,7 +108,9 @@ impl<'a> Visitor<'a> {
             return None;
         }
         let object = self.unwrap_parens(object);
-        let Expression::StringLiteral(s) = object else { return None };
+        let Expression::StringLiteral(s) = object else {
+            return None;
+        };
 
         let first_arg = call.arguments.first()?;
         let idx = self.as_integer_literal(first_arg.as_expression()?)?;
@@ -164,7 +171,10 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
         oxc_ast_visit::walk_mut::walk_expression(self, it);
 
         if let Expression::CallExpression(call) = it {
-            if let Some(repl) = self.resolve_char_at(call).or_else(|| self.resolve_from_char_code(call)) {
+            if let Some(repl) = self
+                .resolve_char_at(call)
+                .or_else(|| self.resolve_from_char_code(call))
+            {
                 *it = repl;
                 self.modified = true;
             }

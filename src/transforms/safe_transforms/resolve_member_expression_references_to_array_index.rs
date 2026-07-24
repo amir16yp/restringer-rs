@@ -17,7 +17,11 @@ impl Transform for ResolveMemberExpressionReferencesToArrayIndex {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, arrays: HashMap::new(), modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            arrays: HashMap::new(),
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -33,22 +37,33 @@ struct Visitor<'a> {
 impl<'a> Visitor<'a> {
     fn collect_arrays_from_statement_list(&mut self, stmts: &[Statement<'a>]) {
         for stmt in stmts {
-            let Statement::VariableDeclaration(var_decl) = stmt else { continue };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                continue;
+            };
 
             if var_decl.kind != VariableDeclarationKind::Const {
                 continue;
             }
 
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue };
-                let Some(init) = decl.init.as_ref() else { continue };
-                let Expression::ArrayExpression(arr) = init else { continue };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
+                let Some(init) = decl.init.as_ref() else {
+                    continue;
+                };
+                let Expression::ArrayExpression(arr) = init else {
+                    continue;
+                };
 
                 if arr.elements.len() <= MIN_ARRAY_LENGTH {
                     continue;
                 }
 
-                self.arrays.insert(binding.name.as_str().to_string(), arr.elements.clone_in(self.allocator));
+                self.arrays.insert(
+                    binding.name.as_str().to_string(),
+                    arr.elements.clone_in(self.allocator),
+                );
             }
         }
     }
@@ -72,8 +87,13 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn replace_computed_member_if_possible(&mut self, mem: &ComputedMemberExpression<'a>) -> Option<Expression<'a>> {
-        let Expression::Identifier(obj) = &mem.object else { return None };
+    fn replace_computed_member_if_possible(
+        &mut self,
+        mem: &ComputedMemberExpression<'a>,
+    ) -> Option<Expression<'a>> {
+        let Expression::Identifier(obj) = &mem.object else {
+            return None;
+        };
         let name = obj.name.as_str();
         let elements = self.arrays.get(name)?;
 
@@ -87,8 +107,13 @@ impl<'a> Visitor<'a> {
         Some(expr.clone_in(self.allocator))
     }
 
-    fn drop_array_binding_in_declarator(&mut self, decl: &VariableDeclarator<'a>) -> Option<oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
-        let BindingPattern::BindingIdentifier(binding) = &decl.id else { return None };
+    fn drop_array_binding_in_declarator(
+        &mut self,
+        decl: &VariableDeclarator<'a>,
+    ) -> Option<oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>> {
+        let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+            return None;
+        };
         self.arrays.remove(binding.name.as_str())
     }
 
@@ -97,8 +122,11 @@ impl<'a> Visitor<'a> {
         decl: &VariableDeclarator<'a>,
         elements: oxc_allocator::Vec<'a, ArrayExpressionElement<'a>>,
     ) {
-        let BindingPattern::BindingIdentifier(binding) = &decl.id else { return };
-        self.arrays.insert(binding.name.as_str().to_string(), elements);
+        let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+            return;
+        };
+        self.arrays
+            .insert(binding.name.as_str().to_string(), elements);
     }
 }
 

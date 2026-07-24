@@ -75,7 +75,11 @@ impl Transform for ResolveLocalCalls {
                 Statement::ExpressionStatement(expr_stmt) => {
                     // Check if it is an IIFE (commonly used to rotate arrays)
                     if let Expression::CallExpression(call) = &expr_stmt.expression {
-                        if matches!(call.callee, Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)) {
+                        if matches!(
+                            call.callee,
+                            Expression::FunctionExpression(_)
+                                | Expression::ArrowFunctionExpression(_)
+                        ) {
                             context_parts.push(code);
                         }
                     }
@@ -138,7 +142,7 @@ impl<'a, 'b> VisitMut<'a> for LocalCallsVisitor<'a, 'b> {
         if let Expression::CallExpression(call) = expr {
             if let Expression::Identifier(ident) = &call.callee {
                 let callee_name = ident.name.as_str();
-                
+
                 // Do not evaluate if we are inside the function itself to avoid recursion,
                 // or if it's a global we should skip.
                 if Some(callee_name) == self.current_function.as_deref() {
@@ -159,8 +163,13 @@ impl<'a, 'b> VisitMut<'a> for LocalCallsVisitor<'a, 'b> {
                         let call_code = helpers::expression_to_code(expr);
                         if !call_code.is_empty() {
                             let full_code = format!("{};\n{}", self.context_code, call_code);
-                            if let Ok(json_res) = self.transform.evaluator.eval_to_json(&full_code) {
-                                if let Some(new_expr) = helpers::parse_expression_in(self.allocator, &json_res, expr.span()) {
+                            if let Ok(json_res) = self.transform.evaluator.eval_to_json(&full_code)
+                            {
+                                if let Some(new_expr) = helpers::parse_expression_in(
+                                    self.allocator,
+                                    &json_res,
+                                    expr.span(),
+                                ) {
                                     *expr = new_expr;
                                     self.modified = true;
                                 }

@@ -14,7 +14,11 @@ impl Transform for ResolveFunctionConstructorCalls {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, source_type: ctx.source_type, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            source_type: ctx.source_type,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -79,7 +83,10 @@ impl<'a> Visitor<'a> {
         // do not permanently grow the main deobfuscation arena.
         let temp_allocator = Allocator::default();
         let parse_ret = Parser::new(&temp_allocator, &code, self.source_type)
-            .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
+            .with_options(ParseOptions {
+                parse_regular_expression: true,
+                ..ParseOptions::default()
+            })
             .parse();
         if !parse_ret.errors.is_empty() {
             return None;
@@ -124,7 +131,10 @@ impl<'a> Visitor<'a> {
     fn boxed_expression(&self, expr: Expression<'a>) -> Expression<'a> {
         // Ensure we own arena allocations properly when we replace nodes.
         match expr {
-            Expression::CallExpression(c) => Expression::CallExpression(ArenaBox::new_in((*c).clone_in(self.allocator), self.allocator)),
+            Expression::CallExpression(c) => Expression::CallExpression(ArenaBox::new_in(
+                (*c).clone_in(self.allocator),
+                self.allocator,
+            )),
             other => other,
         }
     }

@@ -14,7 +14,10 @@ pub fn statement_to_code(stmt: &Statement) -> String {
     let allocator = Allocator::default();
     let mut program = empty_program(&allocator);
     program.body.push(stmt.clone_in(&allocator));
-    Codegen::new().with_options(CodegenOptions::default()).build(&program).code
+    Codegen::new()
+        .with_options(CodegenOptions::default())
+        .build(&program)
+        .code
 }
 
 /// Generates JS source code for an expression (without a trailing semicolon).
@@ -22,15 +25,20 @@ pub fn expression_to_code(expr: &Expression) -> String {
     let allocator = Allocator::default();
     let mut program = empty_program(&allocator);
     let cloned = expr.clone_in(&allocator);
-    program.body.push(Statement::ExpressionStatement(oxc_allocator::Box::new_in(
-        ExpressionStatement {
-            node_id: Cell::new(NodeId::DUMMY),
-            span: oxc_span::SPAN,
-            expression: cloned,
-        },
-        &allocator,
-    )));
-    let mut code = Codegen::new().with_options(CodegenOptions::default()).build(&program).code;
+    program
+        .body
+        .push(Statement::ExpressionStatement(oxc_allocator::Box::new_in(
+            ExpressionStatement {
+                node_id: Cell::new(NodeId::DUMMY),
+                span: oxc_span::SPAN,
+                expression: cloned,
+            },
+            &allocator,
+        )));
+    let mut code = Codegen::new()
+        .with_options(CodegenOptions::default())
+        .build(&program)
+        .code;
     let trimmed = code.trim_end();
     code.truncate(trimmed.len());
     if code.ends_with(';') {
@@ -93,8 +101,10 @@ pub fn is_static_literal(expr: &Expression) -> bool {
         | Expression::BooleanLiteral(_)
         | Expression::NullLiteral(_) => true,
         Expression::UnaryExpression(un) => {
-            matches!(un.operator, UnaryOperator::UnaryNegation | UnaryOperator::UnaryPlus)
-                && matches!(un.argument, Expression::NumericLiteral(_))
+            matches!(
+                un.operator,
+                UnaryOperator::UnaryNegation | UnaryOperator::UnaryPlus
+            ) && matches!(un.argument, Expression::NumericLiteral(_))
         }
         _ => false,
     }
@@ -112,34 +122,77 @@ pub fn is_static_literal_array(arr: &ArrayExpression) -> bool {
 /// Identifier names that should never be resolved/evaluated because they
 /// reference environment-dependent or side-effecting globals.
 pub const SKIP_IDENTIFIERS: &[&str] = &[
-    "window", "document", "location", "navigator", "fetch", "XMLHttpRequest",
-    "WebSocket", "localStorage", "sessionStorage", "process", "require",
-    "module", "exports", "globalThis", "self", "alert", "prompt", "confirm",
-    "setTimeout", "setInterval", "setImmediate", "Date", "Math.random",
+    "window",
+    "document",
+    "location",
+    "navigator",
+    "fetch",
+    "XMLHttpRequest",
+    "WebSocket",
+    "localStorage",
+    "sessionStorage",
+    "process",
+    "require",
+    "module",
+    "exports",
+    "globalThis",
+    "self",
+    "alert",
+    "prompt",
+    "confirm",
+    "setTimeout",
+    "setInterval",
+    "setImmediate",
+    "Date",
+    "Math.random",
 ];
 
 /// Property/method names that should not be resolved (environment-dependent
 /// or commonly used for anti-debugging).
 pub const SKIP_PROPERTIES: &[&str] = &[
-    "test", "exec", "match", "matchAll", "random", "now", "getTime",
-    "getTimezoneOffset", "toLocaleString", "toLocaleDateString",
-    "toLocaleTimeString", "apply", "call", "bind",
+    "test",
+    "exec",
+    "match",
+    "matchAll",
+    "random",
+    "now",
+    "getTime",
+    "getTimezoneOffset",
+    "toLocaleString",
+    "toLocaleDateString",
+    "toLocaleTimeString",
+    "apply",
+    "call",
+    "bind",
 ];
 
 /// Returns true if the given source snippet references any identifier that
 /// indicates side effects or environment dependence.
 pub fn contains_skip_word(code: &str) -> bool {
     const WORDS: &[&str] = &[
-        "document", "window", "fetch", "XMLHttpRequest", "WebSocket",
-        "location", "navigator", "localStorage", "sessionStorage",
-        "require(", "process.", "Math.random", "Date.now", "new Date",
+        "document",
+        "window",
+        "fetch",
+        "XMLHttpRequest",
+        "WebSocket",
+        "location",
+        "navigator",
+        "localStorage",
+        "sessionStorage",
+        "require(",
+        "process.",
+        "Math.random",
+        "Date.now",
+        "new Date",
     ];
     WORDS.iter().any(|w| code.contains(w))
 }
 
 /// Collects the names of all identifier references inside a statement.
 pub fn collect_referenced_idents(stmt: &Statement) -> HashSet<String> {
-    let mut collector = IdentCollector { names: HashSet::new() };
+    let mut collector = IdentCollector {
+        names: HashSet::new(),
+    };
     collector.visit_statement(stmt);
     collector.names
 }

@@ -17,7 +17,10 @@ impl Transform for ResolveJSFuckPrimitives {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Resolver { allocator: ctx.allocator, modified: false };
+        let mut v = Resolver {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -151,7 +154,11 @@ impl<'a> Resolver<'a> {
 
     fn make_boolean(&self, span: Span, value: bool) -> Expression<'a> {
         Expression::BooleanLiteral(ArenaBox::new_in(
-            BooleanLiteral { node_id: Cell::new(NodeId::DUMMY), span, value },
+            BooleanLiteral {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                value,
+            },
             self.allocator,
         ))
     }
@@ -206,15 +213,22 @@ impl<'a> Resolver<'a> {
     }
 
     fn has_string_operand(&self, expr: &Expression<'a>) -> bool {
-        matches!(expr, Expression::StringLiteral(_) | Expression::ArrayExpression(_))
+        matches!(
+            expr,
+            Expression::StringLiteral(_) | Expression::ArrayExpression(_)
+        )
     }
 
     fn try_simplify_binary(&mut self, expr: &BinaryExpression<'a>) -> Option<Expression<'a>> {
         match expr.operator {
             BinaryOperator::Addition => {
-                let has_string = self.has_string_operand(&expr.left) || self.has_string_operand(&expr.right);
-                let expr_ref = Expression::BinaryExpression(ArenaBox::new_in(expr.clone_in(self.allocator), self.allocator));
-                
+                let has_string =
+                    self.has_string_operand(&expr.left) || self.has_string_operand(&expr.right);
+                let expr_ref = Expression::BinaryExpression(ArenaBox::new_in(
+                    expr.clone_in(self.allocator),
+                    self.allocator,
+                ));
+
                 if has_string {
                     if let Some(str_val) = self.try_eval_to_string(&expr_ref) {
                         return Some(self.make_string(expr.span, str_val));
@@ -231,7 +245,10 @@ impl<'a> Resolver<'a> {
             BinaryOperator::Subtraction
             | BinaryOperator::Multiplication
             | BinaryOperator::Division => {
-                let expr_ref = Expression::BinaryExpression(ArenaBox::new_in(expr.clone_in(self.allocator), self.allocator));
+                let expr_ref = Expression::BinaryExpression(ArenaBox::new_in(
+                    expr.clone_in(self.allocator),
+                    self.allocator,
+                ));
                 if let Some(num_val) = self.try_eval_to_number(&expr_ref) {
                     return Some(self.make_number(expr.span, num_val));
                 }
@@ -241,13 +258,16 @@ impl<'a> Resolver<'a> {
         None
     }
 
-    fn try_simplify_member_expr(&mut self, expr: &ComputedMemberExpression<'a>) -> Option<Expression<'a>> {
+    fn try_simplify_member_expr(
+        &mut self,
+        expr: &ComputedMemberExpression<'a>,
+    ) -> Option<Expression<'a>> {
         let index = self.try_eval_to_number(&expr.expression)?;
-        
+
         if index.fract() != 0.0 || index < 0.0 {
             return None;
         }
-        
+
         let index_usize = index as usize;
 
         match &expr.object {
@@ -283,7 +303,7 @@ impl<'a> VisitMut<'a> for Resolver<'a> {
                 Expression::ComputedMemberExpression(comp) => self.try_simplify_member_expr(comp),
                 _ => None,
             };
-            
+
             if let Some(new_expr) = simplified {
                 *it = new_expr;
                 self.modified = true;

@@ -12,7 +12,10 @@ impl Transform for ReplaceFunctionShellsWithWrappedValueIIFE {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -49,17 +52,19 @@ impl<'a> Visitor<'a> {
             return None;
         }
 
-        let Statement::ReturnStatement(ret) = &body.statements[0] else { return None; };
+        let Statement::ReturnStatement(ret) = &body.statements[0] else {
+            return None;
+        };
         let arg = ret.argument.as_ref()?;
 
         match arg {
-            Expression::Identifier(_) |
-            Expression::StringLiteral(_) |
-            Expression::NumericLiteral(_) |
-            Expression::BooleanLiteral(_) |
-            Expression::NullLiteral(_) |
-            Expression::BigIntLiteral(_) |
-            Expression::RegExpLiteral(_) => Some(arg.clone_in(self.allocator)),
+            Expression::Identifier(_)
+            | Expression::StringLiteral(_)
+            | Expression::NumericLiteral(_)
+            | Expression::BooleanLiteral(_)
+            | Expression::NullLiteral(_)
+            | Expression::BigIntLiteral(_)
+            | Expression::RegExpLiteral(_) => Some(arg.clone_in(self.allocator)),
             _ => None,
         }
     }

@@ -14,7 +14,10 @@ impl Transform for ReplaceBooleanExpressionsWithIf {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -41,10 +44,15 @@ impl<'a> Visitor<'a> {
     fn transform_statement(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
         if let Statement::ExpressionStatement(expr_stmt) = &stmt {
             if let Expression::LogicalExpression(logical) = &expr_stmt.expression {
-                if matches!(logical.operator, oxc_syntax::operator::LogicalOperator::And | oxc_syntax::operator::LogicalOperator::Or)
-                {
+                if matches!(
+                    logical.operator,
+                    oxc_syntax::operator::LogicalOperator::And
+                        | oxc_syntax::operator::LogicalOperator::Or
+                ) {
                     let test = match logical.operator {
-                        oxc_syntax::operator::LogicalOperator::Or => self.invert_test(expr_stmt.span, &logical.left),
+                        oxc_syntax::operator::LogicalOperator::Or => {
+                            self.invert_test(expr_stmt.span, &logical.left)
+                        }
                         _ => logical.left.clone_in(self.allocator),
                     };
 
@@ -61,7 +69,12 @@ impl<'a> Visitor<'a> {
                     body.push(right_stmt);
 
                     let consequent = Statement::BlockStatement(ArenaBox::new_in(
-                        BlockStatement { node_id: Cell::new(NodeId::DUMMY), span: expr_stmt.span, body, scope_id: Default::default() },
+                        BlockStatement {
+                            node_id: Cell::new(NodeId::DUMMY),
+                            span: expr_stmt.span,
+                            body,
+                            scope_id: Default::default(),
+                        },
                         self.allocator,
                     ));
 

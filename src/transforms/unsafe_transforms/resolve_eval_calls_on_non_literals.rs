@@ -13,7 +13,9 @@ pub struct ResolveEvalCallsOnNonLiterals {
 
 impl ResolveEvalCallsOnNonLiterals {
     pub fn new() -> Self {
-        Self { evaluator: JsEvaluator::new() }
+        Self {
+            evaluator: JsEvaluator::new(),
+        }
     }
 }
 
@@ -92,12 +94,18 @@ fn is_eval_call_with_non_literal(call: &CallExpression) -> bool {
     !matches!(arg, Expression::StringLiteral(_))
 }
 
-fn parse_statements<'a>(allocator: &'a oxc_allocator::Allocator, code: &str) -> Option<Vec<Statement<'a>>> {
+fn parse_statements<'a>(
+    allocator: &'a oxc_allocator::Allocator,
+    code: &str,
+) -> Option<Vec<Statement<'a>>> {
     let source = allocator.alloc_str(&format!("{}\n", code));
     let mut ret = Parser::new(allocator, source, SourceType::mjs()).parse();
     if !ret.errors.is_empty() {
         // Try a repair heuristic similar to the JS implementation: insert newlines after closing brackets.
-        let repaired = code.replace(")", ")\n").replace("]", "]\n").replace("}", "}\n");
+        let repaired = code
+            .replace(")", ")\n")
+            .replace("]", "]\n")
+            .replace("}", "}\n");
         let source2 = allocator.alloc_str(&format!("{}\n", repaired));
         ret = Parser::new(allocator, source2, SourceType::mjs()).parse();
         if !ret.errors.is_empty() {
@@ -107,5 +115,11 @@ fn parse_statements<'a>(allocator: &'a oxc_allocator::Allocator, code: &str) -> 
     if ret.program.body.is_empty() {
         return None;
     }
-    Some(ret.program.body.into_iter().map(|stmt| stmt.clone_in(allocator)).collect())
+    Some(
+        ret.program
+            .body
+            .into_iter()
+            .map(|stmt| stmt.clone_in(allocator))
+            .collect(),
+    )
 }

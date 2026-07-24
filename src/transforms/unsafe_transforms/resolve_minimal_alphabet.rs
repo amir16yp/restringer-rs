@@ -13,7 +13,9 @@ pub struct ResolveMinimalAlphabet {
 
 impl ResolveMinimalAlphabet {
     pub fn new() -> Self {
-        Self { evaluator: JsEvaluator::new() }
+        Self {
+            evaluator: JsEvaluator::new(),
+        }
     }
 }
 
@@ -59,7 +61,9 @@ impl<'a, 'b> MinimalAlphabetVisitor<'a, 'b> {
         };
         match self.transform.evaluator().eval_to_json(&code) {
             Ok(json) => {
-                if let Some(new_expr) = super::helpers::parse_expression_in(self.allocator, &json, expr.span()) {
+                if let Some(new_expr) =
+                    super::helpers::parse_expression_in(self.allocator, &json, expr.span())
+                {
                     *expr = new_expr;
                     self.modified = true;
                 }
@@ -90,7 +94,10 @@ impl<'a, 'b> VisitMut<'a> for MinimalAlphabetVisitor<'a, 'b> {
                 } else {
                     let arg = &un.argument;
                     // Skip numeric literals/bigints; arrays and non-numeric literals are allowed.
-                    if matches!(arg, Expression::NumericLiteral(_) | Expression::BigIntLiteral(_)) {
+                    if matches!(
+                        arg,
+                        Expression::NumericLiteral(_) | Expression::BigIntLiteral(_)
+                    ) {
                         false
                     } else if matches!(arg, Expression::ArrayExpression(_)) {
                         true

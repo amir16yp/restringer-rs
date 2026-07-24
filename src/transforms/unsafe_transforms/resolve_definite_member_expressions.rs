@@ -14,7 +14,9 @@ pub struct ResolveDefiniteMemberExpressions {
 
 impl ResolveDefiniteMemberExpressions {
     pub fn new() -> Self {
-        Self { evaluator: JsEvaluator::new() }
+        Self {
+            evaluator: JsEvaluator::new(),
+        }
     }
 }
 
@@ -30,7 +32,9 @@ impl Transform for ResolveDefiniteMemberExpressions {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut collector = SkipSpanCollector { skip_spans: HashSet::new() };
+        let mut collector = SkipSpanCollector {
+            skip_spans: HashSet::new(),
+        };
         collector.visit_program(program);
 
         let mut visitor = DefiniteMemberVisitor {
@@ -56,21 +60,34 @@ struct SkipSpanCollector {
 
 impl<'a> Visit<'a> for SkipSpanCollector {
     fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
-        if matches!(&it.callee, Expression::StaticMemberExpression(_) | Expression::ComputedMemberExpression(_) | Expression::PrivateFieldExpression(_)) {
+        if matches!(
+            &it.callee,
+            Expression::StaticMemberExpression(_)
+                | Expression::ComputedMemberExpression(_)
+                | Expression::PrivateFieldExpression(_)
+        ) {
             self.skip_spans.insert(it.callee.span());
         }
         oxc_ast_visit::walk::walk_call_expression(self, it);
     }
 
     fn visit_update_expression(&mut self, it: &UpdateExpression<'a>) {
-        if matches!(&it.argument, SimpleAssignmentTarget::StaticMemberExpression(_) | SimpleAssignmentTarget::ComputedMemberExpression(_)) {
+        if matches!(
+            &it.argument,
+            SimpleAssignmentTarget::StaticMemberExpression(_)
+                | SimpleAssignmentTarget::ComputedMemberExpression(_)
+        ) {
             self.skip_spans.insert(it.argument.span());
         }
         oxc_ast_visit::walk::walk_update_expression(self, it);
     }
 
     fn visit_assignment_expression(&mut self, it: &AssignmentExpression<'a>) {
-        if matches!(&it.left, AssignmentTarget::StaticMemberExpression(_) | AssignmentTarget::ComputedMemberExpression(_)) {
+        if matches!(
+            &it.left,
+            AssignmentTarget::StaticMemberExpression(_)
+                | AssignmentTarget::ComputedMemberExpression(_)
+        ) {
             self.skip_spans.insert(it.left.span());
         }
         oxc_ast_visit::walk::walk_assignment_expression(self, it);
@@ -86,7 +103,10 @@ struct DefiniteMemberVisitor<'a, 'b> {
 
 impl<'a, 'b> DefiniteMemberVisitor<'a, 'b> {
     fn try_replace(&mut self, expr: &mut Expression<'a>) {
-        if !matches!(expr, Expression::StaticMemberExpression(_) | Expression::ComputedMemberExpression(_)) {
+        if !matches!(
+            expr,
+            Expression::StaticMemberExpression(_) | Expression::ComputedMemberExpression(_)
+        ) {
             return;
         }
         if self.skip_spans.contains(&expr.span()) {
@@ -103,7 +123,9 @@ impl<'a, 'b> DefiniteMemberVisitor<'a, 'b> {
 
         match self.transform.evaluator().eval_to_json(&code) {
             Ok(json) => {
-                if let Some(new_expr) = super::helpers::parse_expression_in(self.allocator, &json, expr.span()) {
+                if let Some(new_expr) =
+                    super::helpers::parse_expression_in(self.allocator, &json, expr.span())
+                {
                     *expr = new_expr;
                     self.modified = true;
                 }

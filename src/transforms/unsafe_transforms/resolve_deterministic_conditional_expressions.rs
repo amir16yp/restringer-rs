@@ -12,7 +12,9 @@ pub struct ResolveDeterministicConditionalExpressions {
 
 impl ResolveDeterministicConditionalExpressions {
     pub fn new() -> Self {
-        Self { evaluator: JsEvaluator::new() }
+        Self {
+            evaluator: JsEvaluator::new(),
+        }
     }
 }
 
@@ -60,7 +62,11 @@ impl<'a, 'b> VisitMut<'a> for ConditionalVisitor<'a, 'b> {
                     Ok(c) => c,
                     Err(_) => return,
                 };
-                match self.transform.evaluator().eval_to_bool(&format!("Boolean({})", test_code)) {
+                match self
+                    .transform
+                    .evaluator()
+                    .eval_to_bool(&format!("Boolean({})", test_code))
+                {
                     Ok(true) => {
                         *expr = cond.consequent.clone_in(self.allocator);
                         self.modified = true;

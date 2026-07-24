@@ -58,10 +58,15 @@ impl<'a> Visitor<'a> {
         )
     }
 
-    fn collect_candidates_from_statement_list(&self, stmts: &[Statement<'a>]) -> HashMap<String, Expression<'a>> {
+    fn collect_candidates_from_statement_list(
+        &self,
+        stmts: &[Statement<'a>],
+    ) -> HashMap<String, Expression<'a>> {
         let mut out = HashMap::new();
         for stmt in stmts {
-            let Statement::VariableDeclaration(var_decl) = stmt else { continue; };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                continue;
+            };
 
             // Be conservative: only inline literals from `const` declarations.
             // `var`/`let` bindings can be reassigned from nested closures, which this pass does not
@@ -70,12 +75,19 @@ impl<'a> Visitor<'a> {
                 continue;
             }
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue; };
-                let Some(init) = decl.init.as_ref() else { continue; };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
+                let Some(init) = decl.init.as_ref() else {
+                    continue;
+                };
                 if !Self::is_literal_expr(init) {
                     continue;
                 }
-                out.insert(binding.name.as_str().to_string(), init.clone_in(self.allocator));
+                out.insert(
+                    binding.name.as_str().to_string(),
+                    init.clone_in(self.allocator),
+                );
             }
         }
         out
@@ -99,9 +111,13 @@ impl<'a> Visitor<'a> {
 
         // 1) Collect `let a;` style declarations.
         for stmt in stmts {
-            let Statement::VariableDeclaration(var_decl) = stmt else { continue; };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                continue;
+            };
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue; };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
                 if decl.init.is_none() {
                     declared_uninit.insert(binding.name.as_str().to_string());
                 }
@@ -130,7 +146,12 @@ impl<'a> Visitor<'a> {
                 _ => {}
             }
 
-            self.collect_writes_and_single_literal_assignment(stmt, &mut assignment_count, &mut assignment_literal, &mut disqualified);
+            self.collect_writes_and_single_literal_assignment(
+                stmt,
+                &mut assignment_count,
+                &mut assignment_literal,
+                &mut disqualified,
+            );
         }
 
         let mut out = HashMap::new();
@@ -142,20 +163,30 @@ impl<'a> Visitor<'a> {
                 continue;
             }
 
-            let Some(count) = assignment_count.get(&name) else { continue; };
+            let Some(count) = assignment_count.get(&name) else {
+                continue;
+            };
             if *count != 1 {
                 continue;
             }
-            let Some(lit) = assignment_literal.get(&name) else { continue; };
+            let Some(lit) = assignment_literal.get(&name) else {
+                continue;
+            };
             out.insert(name, lit.clone_in(self.allocator));
         }
 
         out
     }
 
-    fn collect_used_in_conditional_from_statement(&self, stmt: &Statement<'a>, out: &mut HashSet<String>) {
+    fn collect_used_in_conditional_from_statement(
+        &self,
+        stmt: &Statement<'a>,
+        out: &mut HashSet<String>,
+    ) {
         match stmt {
-            Statement::ExpressionStatement(es) => self.collect_used_in_conditional_from_expression(&es.expression, out),
+            Statement::ExpressionStatement(es) => {
+                self.collect_used_in_conditional_from_expression(&es.expression, out)
+            }
             Statement::ReturnStatement(rs) => {
                 if let Some(arg) = rs.argument.as_ref() {
                     self.collect_used_in_conditional_from_expression(arg, out);
@@ -212,7 +243,11 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn collect_used_in_conditional_from_expression(&self, expr: &Expression<'a>, out: &mut HashSet<String>) {
+    fn collect_used_in_conditional_from_expression(
+        &self,
+        expr: &Expression<'a>,
+        out: &mut HashSet<String>,
+    ) {
         match expr {
             Expression::ConditionalExpression(c) => {
                 self.collect_all_identifier_names_in_expression(&c.test, out);
@@ -224,7 +259,9 @@ impl<'a> Visitor<'a> {
                 self.collect_used_in_conditional_from_expression(&c.consequent, out);
                 self.collect_used_in_conditional_from_expression(&c.alternate, out);
             }
-            Expression::ParenthesizedExpression(p) => self.collect_used_in_conditional_from_expression(&p.expression, out),
+            Expression::ParenthesizedExpression(p) => {
+                self.collect_used_in_conditional_from_expression(&p.expression, out)
+            }
             Expression::SequenceExpression(seq) => {
                 for e in &seq.expressions {
                     self.collect_used_in_conditional_from_expression(e, out);
@@ -238,7 +275,9 @@ impl<'a> Visitor<'a> {
                 self.collect_used_in_conditional_from_expression(&log.left, out);
                 self.collect_used_in_conditional_from_expression(&log.right, out);
             }
-            Expression::UnaryExpression(un) => self.collect_used_in_conditional_from_expression(&un.argument, out),
+            Expression::UnaryExpression(un) => {
+                self.collect_used_in_conditional_from_expression(&un.argument, out)
+            }
             Expression::CallExpression(call) => {
                 self.collect_used_in_conditional_from_expression(&call.callee, out);
                 for a in &call.arguments {
@@ -254,8 +293,12 @@ impl<'a> Visitor<'a> {
                 self.collect_used_in_conditional_from_expression(&c.object, out);
                 self.collect_used_in_conditional_from_expression(&c.expression, out);
             }
-            Expression::StaticMemberExpression(s) => self.collect_used_in_conditional_from_expression(&s.object, out),
-            Expression::PrivateFieldExpression(p) => self.collect_used_in_conditional_from_expression(&p.object, out),
+            Expression::StaticMemberExpression(s) => {
+                self.collect_used_in_conditional_from_expression(&s.object, out)
+            }
+            Expression::PrivateFieldExpression(p) => {
+                self.collect_used_in_conditional_from_expression(&p.object, out)
+            }
             Expression::ArrayExpression(arr) => {
                 for el in &arr.elements {
                     if let Some(expr) = el.as_expression() {
@@ -266,8 +309,12 @@ impl<'a> Visitor<'a> {
             Expression::ObjectExpression(obj) => {
                 for prop in &obj.properties {
                     match prop {
-                        ObjectPropertyKind::ObjectProperty(p) => self.collect_used_in_conditional_from_expression(&p.value, out),
-                        ObjectPropertyKind::SpreadProperty(s) => self.collect_used_in_conditional_from_expression(&s.argument, out),
+                        ObjectPropertyKind::ObjectProperty(p) => {
+                            self.collect_used_in_conditional_from_expression(&p.value, out)
+                        }
+                        ObjectPropertyKind::SpreadProperty(s) => {
+                            self.collect_used_in_conditional_from_expression(&s.argument, out)
+                        }
                     }
                 }
             }
@@ -275,12 +322,18 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn collect_all_identifier_names_in_expression(&self, expr: &Expression<'a>, out: &mut HashSet<String>) {
+    fn collect_all_identifier_names_in_expression(
+        &self,
+        expr: &Expression<'a>,
+        out: &mut HashSet<String>,
+    ) {
         match expr {
             Expression::Identifier(idref) => {
                 out.insert(idref.name.as_str().to_string());
             }
-            Expression::ParenthesizedExpression(p) => self.collect_all_identifier_names_in_expression(&p.expression, out),
+            Expression::ParenthesizedExpression(p) => {
+                self.collect_all_identifier_names_in_expression(&p.expression, out)
+            }
             Expression::SequenceExpression(seq) => {
                 for e in &seq.expressions {
                     self.collect_all_identifier_names_in_expression(e, out);
@@ -294,7 +347,9 @@ impl<'a> Visitor<'a> {
                 self.collect_all_identifier_names_in_expression(&log.left, out);
                 self.collect_all_identifier_names_in_expression(&log.right, out);
             }
-            Expression::UnaryExpression(un) => self.collect_all_identifier_names_in_expression(&un.argument, out),
+            Expression::UnaryExpression(un) => {
+                self.collect_all_identifier_names_in_expression(&un.argument, out)
+            }
             Expression::ConditionalExpression(c) => {
                 self.collect_all_identifier_names_in_expression(&c.test, out);
                 self.collect_all_identifier_names_in_expression(&c.consequent, out);
@@ -315,8 +370,12 @@ impl<'a> Visitor<'a> {
                 self.collect_all_identifier_names_in_expression(&c.object, out);
                 self.collect_all_identifier_names_in_expression(&c.expression, out);
             }
-            Expression::StaticMemberExpression(s) => self.collect_all_identifier_names_in_expression(&s.object, out),
-            Expression::PrivateFieldExpression(p) => self.collect_all_identifier_names_in_expression(&p.object, out),
+            Expression::StaticMemberExpression(s) => {
+                self.collect_all_identifier_names_in_expression(&s.object, out)
+            }
+            Expression::PrivateFieldExpression(p) => {
+                self.collect_all_identifier_names_in_expression(&p.object, out)
+            }
             Expression::ArrayExpression(arr) => {
                 for el in &arr.elements {
                     if let Some(expr) = el.as_expression() {
@@ -327,8 +386,12 @@ impl<'a> Visitor<'a> {
             Expression::ObjectExpression(obj) => {
                 for prop in &obj.properties {
                     match prop {
-                        ObjectPropertyKind::ObjectProperty(p) => self.collect_all_identifier_names_in_expression(&p.value, out),
-                        ObjectPropertyKind::SpreadProperty(s) => self.collect_all_identifier_names_in_expression(&s.argument, out),
+                        ObjectPropertyKind::ObjectProperty(p) => {
+                            self.collect_all_identifier_names_in_expression(&p.value, out)
+                        }
+                        ObjectPropertyKind::SpreadProperty(s) => {
+                            self.collect_all_identifier_names_in_expression(&s.argument, out)
+                        }
                     }
                 }
             }
@@ -344,58 +407,152 @@ impl<'a> Visitor<'a> {
         disqualified: &mut HashSet<String>,
     ) {
         match stmt {
-            Statement::ExpressionStatement(es) => {
-                self.collect_writes_and_single_literal_assignment_expr(&es.expression, assignment_count, assignment_literal, disqualified)
-            }
+            Statement::ExpressionStatement(es) => self
+                .collect_writes_and_single_literal_assignment_expr(
+                    &es.expression,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                ),
             Statement::ReturnStatement(rs) => {
                 if let Some(arg) = rs.argument.as_ref() {
-                    self.collect_writes_and_single_literal_assignment_expr(arg, assignment_count, assignment_literal, disqualified);
+                    self.collect_writes_and_single_literal_assignment_expr(
+                        arg,
+                        assignment_count,
+                        assignment_literal,
+                        disqualified,
+                    );
                 }
             }
             Statement::IfStatement(ifstmt) => {
-                self.collect_writes_and_single_literal_assignment_expr(&ifstmt.test, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment(&ifstmt.consequent, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &ifstmt.test,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment(
+                    &ifstmt.consequent,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
                 if let Some(alt) = ifstmt.alternate.as_ref() {
-                    self.collect_writes_and_single_literal_assignment(alt, assignment_count, assignment_literal, disqualified);
+                    self.collect_writes_and_single_literal_assignment(
+                        alt,
+                        assignment_count,
+                        assignment_literal,
+                        disqualified,
+                    );
                 }
             }
             Statement::BlockStatement(block) => {
                 for s in &block.body {
-                    self.collect_writes_and_single_literal_assignment(s, assignment_count, assignment_literal, disqualified);
+                    self.collect_writes_and_single_literal_assignment(
+                        s,
+                        assignment_count,
+                        assignment_literal,
+                        disqualified,
+                    );
                 }
             }
             Statement::ForStatement(fs) => {
                 if let Some(init) = fs.init.as_ref().and_then(|i| i.as_expression()) {
-                    self.collect_writes_and_single_literal_assignment_expr(init, assignment_count, assignment_literal, disqualified);
+                    self.collect_writes_and_single_literal_assignment_expr(
+                        init,
+                        assignment_count,
+                        assignment_literal,
+                        disqualified,
+                    );
                 }
                 if let Some(test) = fs.test.as_ref() {
-                    self.collect_writes_and_single_literal_assignment_expr(test, assignment_count, assignment_literal, disqualified);
+                    self.collect_writes_and_single_literal_assignment_expr(
+                        test,
+                        assignment_count,
+                        assignment_literal,
+                        disqualified,
+                    );
                 }
                 if let Some(update) = fs.update.as_ref() {
-                    self.collect_writes_and_single_literal_assignment_expr(update, assignment_count, assignment_literal, disqualified);
+                    self.collect_writes_and_single_literal_assignment_expr(
+                        update,
+                        assignment_count,
+                        assignment_literal,
+                        disqualified,
+                    );
                 }
-                self.collect_writes_and_single_literal_assignment(&fs.body, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment(
+                    &fs.body,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Statement::ForInStatement(for_in) => {
-                self.collect_writes_and_single_literal_assignment_expr(&for_in.right, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment(&for_in.body, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &for_in.right,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment(
+                    &for_in.body,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Statement::ForOfStatement(for_of) => {
-                self.collect_writes_and_single_literal_assignment_expr(&for_of.right, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment(&for_of.body, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &for_of.right,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment(
+                    &for_of.body,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Statement::WhileStatement(ws) => {
-                self.collect_writes_and_single_literal_assignment_expr(&ws.test, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment(&ws.body, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &ws.test,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment(
+                    &ws.body,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Statement::DoWhileStatement(ws) => {
-                self.collect_writes_and_single_literal_assignment(&ws.body, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment_expr(&ws.test, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment(
+                    &ws.body,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &ws.test,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Statement::VariableDeclaration(var_decl) => {
                 for decl in &var_decl.declarations {
                     if let Some(init) = decl.init.as_ref() {
-                        self.collect_writes_and_single_literal_assignment_expr(init, assignment_count, assignment_literal, disqualified);
+                        self.collect_writes_and_single_literal_assignment_expr(
+                            init,
+                            assignment_count,
+                            assignment_literal,
+                            disqualified,
+                        );
                     }
                 }
             }
@@ -418,13 +575,20 @@ impl<'a> Visitor<'a> {
 
                     if Self::is_literal_expr(&a.right) {
                         // Keep the RHS literal from the (first) assignment.
-                        assignment_literal.entry(name).or_insert_with(|| a.right.clone_in(self.allocator));
+                        assignment_literal
+                            .entry(name)
+                            .or_insert_with(|| a.right.clone_in(self.allocator));
                     } else {
                         disqualified.insert(name);
                     }
                 }
 
-                self.collect_writes_and_single_literal_assignment_expr(&a.right, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &a.right,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Expression::UpdateExpression(u) => {
                 if let SimpleAssignmentTarget::AssignmentTargetIdentifier(id) = &u.argument {
@@ -432,51 +596,135 @@ impl<'a> Visitor<'a> {
                 }
             }
             Expression::ConditionalExpression(c) => {
-                self.collect_writes_and_single_literal_assignment_expr(&c.test, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment_expr(&c.consequent, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment_expr(&c.alternate, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &c.test,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &c.consequent,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &c.alternate,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Expression::CallExpression(call) => {
-                self.collect_writes_and_single_literal_assignment_expr(&call.callee, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &call.callee,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
                 for a in &call.arguments {
                     if let Some(e) = a.as_expression() {
-                        self.collect_writes_and_single_literal_assignment_expr(e, assignment_count, assignment_literal, disqualified);
+                        self.collect_writes_and_single_literal_assignment_expr(
+                            e,
+                            assignment_count,
+                            assignment_literal,
+                            disqualified,
+                        );
                     }
                 }
             }
             Expression::SequenceExpression(seq) => {
                 for e in &seq.expressions {
-                    self.collect_writes_and_single_literal_assignment_expr(e, assignment_count, assignment_literal, disqualified);
+                    self.collect_writes_and_single_literal_assignment_expr(
+                        e,
+                        assignment_count,
+                        assignment_literal,
+                        disqualified,
+                    );
                 }
             }
             Expression::BinaryExpression(bin) => {
-                self.collect_writes_and_single_literal_assignment_expr(&bin.left, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment_expr(&bin.right, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &bin.left,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &bin.right,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Expression::LogicalExpression(log) => {
-                self.collect_writes_and_single_literal_assignment_expr(&log.left, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment_expr(&log.right, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &log.left,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &log.right,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Expression::UnaryExpression(un) => {
-                self.collect_writes_and_single_literal_assignment_expr(&un.argument, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &un.argument,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
-            Expression::ParenthesizedExpression(p) => {
-                self.collect_writes_and_single_literal_assignment_expr(&p.expression, assignment_count, assignment_literal, disqualified)
-            }
+            Expression::ParenthesizedExpression(p) => self
+                .collect_writes_and_single_literal_assignment_expr(
+                    &p.expression,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                ),
             Expression::ComputedMemberExpression(c) => {
-                self.collect_writes_and_single_literal_assignment_expr(&c.object, assignment_count, assignment_literal, disqualified);
-                self.collect_writes_and_single_literal_assignment_expr(&c.expression, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &c.object,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &c.expression,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Expression::StaticMemberExpression(s) => {
-                self.collect_writes_and_single_literal_assignment_expr(&s.object, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &s.object,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Expression::PrivateFieldExpression(p) => {
-                self.collect_writes_and_single_literal_assignment_expr(&p.object, assignment_count, assignment_literal, disqualified);
+                self.collect_writes_and_single_literal_assignment_expr(
+                    &p.object,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                );
             }
             Expression::ArrayExpression(arr) => {
                 for el in &arr.elements {
                     if let Some(expr) = el.as_expression() {
-                        self.collect_writes_and_single_literal_assignment_expr(expr, assignment_count, assignment_literal, disqualified);
+                        self.collect_writes_and_single_literal_assignment_expr(
+                            expr,
+                            assignment_count,
+                            assignment_literal,
+                            disqualified,
+                        );
                     }
                 }
             }
@@ -484,10 +732,20 @@ impl<'a> Visitor<'a> {
                 for prop in &obj.properties {
                     match prop {
                         ObjectPropertyKind::ObjectProperty(p) => {
-                            self.collect_writes_and_single_literal_assignment_expr(&p.value, assignment_count, assignment_literal, disqualified);
+                            self.collect_writes_and_single_literal_assignment_expr(
+                                &p.value,
+                                assignment_count,
+                                assignment_literal,
+                                disqualified,
+                            );
                         }
                         ObjectPropertyKind::SpreadProperty(s) => {
-                            self.collect_writes_and_single_literal_assignment_expr(&s.argument, assignment_count, assignment_literal, disqualified);
+                            self.collect_writes_and_single_literal_assignment_expr(
+                                &s.argument,
+                                assignment_count,
+                                assignment_literal,
+                                disqualified,
+                            );
                         }
                     }
                 }
@@ -506,7 +764,9 @@ impl<'a> Visitor<'a> {
 
     fn collect_modified_names_in_statement(&self, stmt: &Statement<'a>, out: &mut HashSet<String>) {
         match stmt {
-            Statement::ExpressionStatement(es) => self.collect_modified_names_in_expression(&es.expression, out),
+            Statement::ExpressionStatement(es) => {
+                self.collect_modified_names_in_expression(&es.expression, out)
+            }
             Statement::ReturnStatement(rs) => {
                 if let Some(arg) = rs.argument.as_ref() {
                     self.collect_modified_names_in_expression(arg, out);
@@ -575,7 +835,11 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn collect_modified_names_in_expression(&self, expr: &Expression<'a>, out: &mut HashSet<String>) {
+    fn collect_modified_names_in_expression(
+        &self,
+        expr: &Expression<'a>,
+        out: &mut HashSet<String>,
+    ) {
         match expr {
             Expression::AssignmentExpression(a) => {
                 if let AssignmentTarget::AssignmentTargetIdentifier(id) = &a.left {
@@ -627,7 +891,9 @@ impl<'a> Visitor<'a> {
                 self.collect_modified_names_in_expression(&c.consequent, out);
                 self.collect_modified_names_in_expression(&c.alternate, out);
             }
-            Expression::ParenthesizedExpression(p) => self.collect_modified_names_in_expression(&p.expression, out),
+            Expression::ParenthesizedExpression(p) => {
+                self.collect_modified_names_in_expression(&p.expression, out)
+            }
             Expression::ArrayExpression(arr) => {
                 for el in &arr.elements {
                     if let Some(expr) = el.as_expression() {
@@ -659,7 +925,8 @@ impl<'a> Visitor<'a> {
 
         // Case 2: `let a; a = 3; ...` — allow the single assignment itself.
         // Safety is handled inside `collect_candidates_not_assigned_at_declaration`.
-        let candidates_not_assigned_at_decl = self.collect_candidates_not_assigned_at_declaration(stmts);
+        let candidates_not_assigned_at_decl =
+            self.collect_candidates_not_assigned_at_declaration(stmts);
 
         let mut combined = candidates_assigned_at_decl;
         combined.extend(candidates_not_assigned_at_decl);

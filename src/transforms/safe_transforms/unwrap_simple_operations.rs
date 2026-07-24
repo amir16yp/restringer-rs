@@ -19,14 +19,20 @@ impl Transform for UnwrapSimpleOperations {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut collector = Collector { map: HashMap::new() };
+        let mut collector = Collector {
+            map: HashMap::new(),
+        };
         collector.visit_program(program);
 
         if collector.map.is_empty() {
             return false;
         }
 
-        let mut v = Rewriter { allocator: ctx.allocator, map: collector.map, modified: false };
+        let mut v = Rewriter {
+            allocator: ctx.allocator,
+            map: collector.map,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -34,9 +40,15 @@ impl Transform for UnwrapSimpleOperations {
 
 #[derive(Clone)]
 enum OpKind {
-    Binary { operator: BinaryOperator },
-    Logical { operator: LogicalOperator },
-    Unary { operator: oxc_syntax::operator::UnaryOperator },
+    Binary {
+        operator: BinaryOperator,
+    },
+    Logical {
+        operator: LogicalOperator,
+    },
+    Unary {
+        operator: oxc_syntax::operator::UnaryOperator,
+    },
 }
 
 #[derive(Clone)]
@@ -54,7 +66,15 @@ struct Collector {
 impl<'a> Collector {
     fn is_allowed_unary(op: oxc_syntax::operator::UnaryOperator) -> bool {
         use oxc_syntax::operator::UnaryOperator;
-        matches!(op, UnaryOperator::LogicalNot | UnaryOperator::BitwiseNot | UnaryOperator::UnaryPlus | UnaryOperator::UnaryNegation | UnaryOperator::Typeof | UnaryOperator::Void)
+        matches!(
+            op,
+            UnaryOperator::LogicalNot
+                | UnaryOperator::BitwiseNot
+                | UnaryOperator::UnaryPlus
+                | UnaryOperator::UnaryNegation
+                | UnaryOperator::Typeof
+                | UnaryOperator::Void
+        )
     }
 
     fn extract_param_names(params: &FormalParameters<'a>) -> Option<Vec<&'a str>> {
@@ -70,7 +90,9 @@ impl<'a> Collector {
     }
 
     fn match_function_decl(&mut self, f: &Function<'a>) {
-        let Some(id) = f.id.as_ref() else { return; };
+        let Some(id) = f.id.as_ref() else {
+            return;
+        };
         let name = id.name.as_str();
 
         let params = match Self::extract_param_names(&f.params) {
@@ -78,32 +100,60 @@ impl<'a> Collector {
             None => return,
         };
 
-        let Some(body) = f.body.as_ref() else { return; };
+        let Some(body) = f.body.as_ref() else {
+            return;
+        };
         if body.statements.len() != 1 {
             return;
         }
 
-        let Statement::ReturnStatement(ret) = &body.statements[0] else { return; };
-        let Some(arg) = ret.argument.as_ref() else { return; };
+        let Statement::ReturnStatement(ret) = &body.statements[0] else {
+            return;
+        };
+        let Some(arg) = ret.argument.as_ref() else {
+            return;
+        };
 
         match arg {
             Expression::BinaryExpression(bin) => {
-                let Expression::Identifier(l) = &bin.left else { return; };
-                let Expression::Identifier(r) = &bin.right else { return; };
-                if params.len() == 2 && l.name.as_str() == params[0] && r.name.as_str() == params[1] {
+                let Expression::Identifier(l) = &bin.left else {
+                    return;
+                };
+                let Expression::Identifier(r) = &bin.right else {
+                    return;
+                };
+                if params.len() == 2 && l.name.as_str() == params[0] && r.name.as_str() == params[1]
+                {
                     self.map.insert(
                         name.to_string(),
-                        OpInfo { kind: OpKind::Binary { operator: bin.operator }, arity: 2, unary_param_index: 0 },
+                        OpInfo {
+                            kind: OpKind::Binary {
+                                operator: bin.operator,
+                            },
+                            arity: 2,
+                            unary_param_index: 0,
+                        },
                     );
                 }
             }
             Expression::LogicalExpression(log) => {
-                let Expression::Identifier(l) = &log.left else { return; };
-                let Expression::Identifier(r) = &log.right else { return; };
-                if params.len() == 2 && l.name.as_str() == params[0] && r.name.as_str() == params[1] {
+                let Expression::Identifier(l) = &log.left else {
+                    return;
+                };
+                let Expression::Identifier(r) = &log.right else {
+                    return;
+                };
+                if params.len() == 2 && l.name.as_str() == params[0] && r.name.as_str() == params[1]
+                {
                     self.map.insert(
                         name.to_string(),
-                        OpInfo { kind: OpKind::Logical { operator: log.operator }, arity: 2, unary_param_index: 0 },
+                        OpInfo {
+                            kind: OpKind::Logical {
+                                operator: log.operator,
+                            },
+                            arity: 2,
+                            unary_param_index: 0,
+                        },
                     );
                 }
             }
@@ -111,12 +161,16 @@ impl<'a> Collector {
                 if !Self::is_allowed_unary(un.operator) {
                     return;
                 }
-                let Expression::Identifier(id_expr) = &un.argument else { return; };
+                let Expression::Identifier(id_expr) = &un.argument else {
+                    return;
+                };
                 if params.len() == 1 && id_expr.name.as_str() == params[0] {
                     self.map.insert(
                         name.to_string(),
                         OpInfo {
-                            kind: OpKind::Unary { operator: un.operator },
+                            kind: OpKind::Unary {
+                                operator: un.operator,
+                            },
                             arity: 1,
                             unary_param_index: 0,
                         },
@@ -142,16 +196,40 @@ struct Rewriter<'a> {
 }
 
 impl<'a> Rewriter<'a> {
-    fn make_binary_expr(&self, span: Span, op: BinaryOperator, left: Expression<'a>, right: Expression<'a>) -> Expression<'a> {
+    fn make_binary_expr(
+        &self,
+        span: Span,
+        op: BinaryOperator,
+        left: Expression<'a>,
+        right: Expression<'a>,
+    ) -> Expression<'a> {
         Expression::BinaryExpression(ArenaBox::new_in(
-            BinaryExpression { node_id: Cell::new(NodeId::DUMMY), span, operator: op, left, right },
+            BinaryExpression {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                operator: op,
+                left,
+                right,
+            },
             self.allocator,
         ))
     }
 
-    fn make_logical_expr(&self, span: Span, op: LogicalOperator, left: Expression<'a>, right: Expression<'a>) -> Expression<'a> {
+    fn make_logical_expr(
+        &self,
+        span: Span,
+        op: LogicalOperator,
+        left: Expression<'a>,
+        right: Expression<'a>,
+    ) -> Expression<'a> {
         Expression::LogicalExpression(ArenaBox::new_in(
-            LogicalExpression { node_id: Cell::new(NodeId::DUMMY), span, operator: op, left, right },
+            LogicalExpression {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                operator: op,
+                left,
+                right,
+            },
             self.allocator,
         ))
     }
@@ -163,7 +241,12 @@ impl<'a> Rewriter<'a> {
         argument: Expression<'a>,
     ) -> Expression<'a> {
         Expression::UnaryExpression(ArenaBox::new_in(
-            UnaryExpression { node_id: Cell::new(NodeId::DUMMY), span, operator: op, argument },
+            UnaryExpression {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                operator: op,
+                argument,
+            },
             self.allocator,
         ))
     }
@@ -178,26 +261,42 @@ impl<'a> VisitMut<'a> for Rewriter<'a> {
                         let span = call.span;
                         let replacement = match info.kind {
                             OpKind::Binary { operator } => {
-                                let Some(l) = call.arguments.get(0).and_then(|a| a.as_expression()) else {
+                                let Some(l) = call.arguments.get(0).and_then(|a| a.as_expression())
+                                else {
                                     return;
                                 };
-                                let Some(r) = call.arguments.get(1).and_then(|a| a.as_expression()) else {
+                                let Some(r) = call.arguments.get(1).and_then(|a| a.as_expression())
+                                else {
                                     return;
                                 };
-                                self.make_binary_expr(span, operator, l.clone_in(self.allocator), r.clone_in(self.allocator))
+                                self.make_binary_expr(
+                                    span,
+                                    operator,
+                                    l.clone_in(self.allocator),
+                                    r.clone_in(self.allocator),
+                                )
                             }
                             OpKind::Logical { operator } => {
-                                let Some(l) = call.arguments.get(0).and_then(|a| a.as_expression()) else {
+                                let Some(l) = call.arguments.get(0).and_then(|a| a.as_expression())
+                                else {
                                     return;
                                 };
-                                let Some(r) = call.arguments.get(1).and_then(|a| a.as_expression()) else {
+                                let Some(r) = call.arguments.get(1).and_then(|a| a.as_expression())
+                                else {
                                     return;
                                 };
-                                self.make_logical_expr(span, operator, l.clone_in(self.allocator), r.clone_in(self.allocator))
+                                self.make_logical_expr(
+                                    span,
+                                    operator,
+                                    l.clone_in(self.allocator),
+                                    r.clone_in(self.allocator),
+                                )
                             }
                             OpKind::Unary { operator } => {
                                 let idx = info.unary_param_index;
-                                let Some(arg) = call.arguments.get(idx).and_then(|a| a.as_expression()) else {
+                                let Some(arg) =
+                                    call.arguments.get(idx).and_then(|a| a.as_expression())
+                                else {
                                     return;
                                 };
                                 self.make_unary_expr(span, operator, arg.clone_in(self.allocator))

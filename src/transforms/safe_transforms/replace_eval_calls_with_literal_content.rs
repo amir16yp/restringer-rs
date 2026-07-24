@@ -16,7 +16,11 @@ impl Transform for ReplaceEvalCallsWithLiteralContent {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, source_type: ctx.source_type, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            source_type: ctx.source_type,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -45,7 +49,9 @@ impl<'a> Visitor<'a> {
     }
 
     fn is_eval_call(&self, call: &CallExpression<'a>) -> bool {
-        let Expression::Identifier(id) = self.unwrap_parens(&call.callee) else { return false; };
+        let Expression::Identifier(id) = self.unwrap_parens(&call.callee) else {
+            return false;
+        };
         id.name.as_str() == "eval"
     }
 
@@ -61,7 +67,10 @@ impl<'a> Visitor<'a> {
         // Parse into temporary arena so we don't grow the main arena on failed parses.
         let temp_allocator = Allocator::default();
         let parse_ret = Parser::new(&temp_allocator, code, self.source_type)
-            .with_options(ParseOptions { parse_regular_expression: true, ..ParseOptions::default() })
+            .with_options(ParseOptions {
+                parse_regular_expression: true,
+                ..ParseOptions::default()
+            })
             .parse();
         if !parse_ret.errors.is_empty() {
             return None;
@@ -77,7 +86,12 @@ impl<'a> Visitor<'a> {
             for s in body {
                 out.push(s.clone_in(self.allocator));
             }
-            return Some(Replacement::Block(BlockStatement { node_id: Cell::new(NodeId::DUMMY), span, body: out, scope_id: Default::default() }));
+            return Some(Replacement::Block(BlockStatement {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                body: out,
+                scope_id: Default::default(),
+            }));
         }
 
         let stmt = &body[0];
@@ -98,20 +112,32 @@ impl<'a> Visitor<'a> {
 
     fn replace_eval_as_callee(&mut self, call: &mut CallExpression<'a>) -> bool {
         // Handle: eval('Function')('code')
-        let Expression::CallExpression(inner) = self.unwrap_parens(&call.callee) else { return false; };
-        let Some(rep) = self.maybe_eval_replacement(inner) else { return false; };
-        let Replacement::Expr(expr) = rep else { return false; };
+        let Expression::CallExpression(inner) = self.unwrap_parens(&call.callee) else {
+            return false;
+        };
+        let Some(rep) = self.maybe_eval_replacement(inner) else {
+            return false;
+        };
+        let Replacement::Expr(expr) = rep else {
+            return false;
+        };
 
         call.callee = expr;
         true
     }
 
     fn apply_eval_expr_replacement(&mut self, it: &mut Expression<'a>) -> bool {
-        let Expression::CallExpression(call) = it else { return false; };
-        let Some(rep) = self.maybe_eval_replacement(call) else { return false; };
+        let Expression::CallExpression(call) = it else {
+            return false;
+        };
+        let Some(rep) = self.maybe_eval_replacement(call) else {
+            return false;
+        };
 
         // Only safe_transforms to replace an expression with another expression.
-        let Replacement::Expr(expr) = rep else { return false; };
+        let Replacement::Expr(expr) = rep else {
+            return false;
+        };
         *it = expr;
         true
     }
@@ -136,7 +162,8 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
                             return;
                         }
                         Replacement::Block(block) => {
-                            *it = Statement::BlockStatement(ArenaBox::new_in(block, self.allocator));
+                            *it =
+                                Statement::BlockStatement(ArenaBox::new_in(block, self.allocator));
                             self.modified = true;
                             return;
                         }

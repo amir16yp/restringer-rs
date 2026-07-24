@@ -42,7 +42,10 @@ impl Transform for ResolveAugmentedFunctionWrappedArrayReplacements {
                     while let Expression::ParenthesizedExpression(paren) = callee {
                         callee = &paren.expression;
                     }
-                    if matches!(callee, Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)) {
+                    if matches!(
+                        callee,
+                        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
+                    ) {
                         let code = helpers::statement_to_code(stmt);
                         if code.contains(".push(") && code.contains(".shift(") {
                             // Find target argument name (the first arg is usually the array/function reference)
@@ -113,7 +116,9 @@ impl Transform for ResolveAugmentedFunctionWrappedArrayReplacements {
         };
 
         // Parse the JSON result array back into an AST Expression
-        let Some(rotated_expr) = helpers::parse_expression_in(ctx.allocator, &json_res, oxc_span::SPAN) else {
+        let Some(rotated_expr) =
+            helpers::parse_expression_in(ctx.allocator, &json_res, oxc_span::SPAN)
+        else {
             return false;
         };
 

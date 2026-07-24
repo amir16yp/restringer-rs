@@ -1,3 +1,4 @@
+use crate::transforms::safe_transforms::inline_paired_array_pushes::InlinePairedArrayPushes;
 use crate::transforms::safe_transforms::normalize_computed::NormalizeComputed;
 use crate::transforms::safe_transforms::normalize_empty_statements::NormalizeEmptyStatements;
 use crate::transforms::safe_transforms::parse_template_literals_into_string_literals::ParseTemplateLiteralsIntoStringLiterals;
@@ -9,12 +10,16 @@ use crate::{DeobfuscateOptions, Restringer};
 
 fn apply_module_to_code(code: &str, transform: Box<dyn crate::Transform>) -> String {
     let restringer = Restringer::default();
-    restringer.apply_module_to_code(code, transform, DeobfuscateOptions::default()).unwrap()
+    restringer
+        .apply_module_to_code(code, transform, DeobfuscateOptions::default())
+        .unwrap()
 }
 
 fn apply_module_to_code_looped(code: &str, transform: Box<dyn crate::Transform>) -> String {
     let restringer = Restringer::default();
-    restringer.apply_modules_to_code(code, vec![transform], DeobfuscateOptions::default()).unwrap()
+    restringer
+        .apply_modules_to_code(code, vec![transform], DeobfuscateOptions::default())
+        .unwrap()
 }
 
 fn assert_transform(transform_name: &str, input: &str, expected: &str, actual: &str) {
@@ -85,7 +90,8 @@ mod normalize_computed {
     #[test]
     fn tp_3_convert_class_method_definitions_with_valid_identifiers() {
         let code = "class Test { ['method']() {} ['123invalid']() {} ['_valid']() {} }";
-        let expected = "class Test {\n\t[\"method\"]() {}\n\t[\"123invalid\"]() {}\n\t[\"_valid\"]() {}\n}\n";
+        let expected =
+            "class Test {\n\t[\"method\"]() {}\n\t[\"123invalid\"]() {}\n\t[\"_valid\"]() {}\n}\n";
         let result = apply_module_to_code(code, Box::new(NormalizeComputed));
         assert_transform("NormalizeComputed", code, expected, &result);
     }
@@ -177,7 +183,12 @@ mod parse_template_literals_into_string_literals {
         let code = "`hello ${\"world\"}!`;";
         let expected = "(\"hello world!\");\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 
     #[test]
@@ -185,7 +196,12 @@ mod parse_template_literals_into_string_literals {
         let code = "`start ${42} middle ${\"end\"} finish`;";
         let expected = "(\"start 42 middle end finish\");\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 
     #[test]
@@ -193,7 +209,12 @@ mod parse_template_literals_into_string_literals {
         let code = "`just plain text`;";
         let expected = "(\"just plain text\");\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 
     #[test]
@@ -201,7 +222,12 @@ mod parse_template_literals_into_string_literals {
         let code = "`flag: ${true}, count: ${123.456}`;";
         let expected = "(\"flag: true, count: 123.456\");\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 
     #[test]
@@ -209,7 +235,12 @@ mod parse_template_literals_into_string_literals {
         let code = "``;";
         let expected = "(\"\");\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 
     #[test]
@@ -217,7 +248,12 @@ mod parse_template_literals_into_string_literals {
         let code = "`hello ${name}!`;";
         let expected = "`hello ${name}!`;\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 
     #[test]
@@ -225,7 +261,12 @@ mod parse_template_literals_into_string_literals {
         let code = "`result: ${getValue()}`;";
         let expected = "`result: ${getValue()}`;\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 
     #[test]
@@ -233,7 +274,12 @@ mod parse_template_literals_into_string_literals {
         let code = "`hello ${\"world\"} and ${name}!`;";
         let expected = "`hello ${\"world\"} and ${name}!`;\n";
         let result = apply_module_to_code(code, Box::new(ParseTemplateLiteralsIntoStringLiterals));
-        assert_transform("ParseTemplateLiteralsIntoStringLiterals", code, expected, &result);
+        assert_transform(
+            "ParseTemplateLiteralsIntoStringLiterals",
+            code,
+            expected,
+            &result,
+        );
     }
 }
 
@@ -369,7 +415,8 @@ mod rearrange_switches {
     #[test]
     fn tn_2_do_not_transform_switch_with_non_literal_case_value() {
         let code = "var x = 0; switch (x) { case variable: doSomething(); break; }";
-        let expected = "var x = 0;\nswitch (x) {\n\tcase variable:\n\t\tdoSomething();\n\t\tbreak;\n}\n";
+        let expected =
+            "var x = 0;\nswitch (x) {\n\tcase variable:\n\t\tdoSomething();\n\t\tbreak;\n}\n";
         let result = apply_module_to_code(code, Box::new(RearrangeSwitches));
         assert_transform("RearrangeSwitches", code, expected, &result);
     }
@@ -387,7 +434,9 @@ mod resolve_jsfuck_primitives {
     fn test_jsfuck_file() {
         let code = include_str!("../../restringer-js/tests/resources/jsfuck.js");
         let restringer = Restringer::default();
-        let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
+        let result = restringer
+            .deobfuscate(code, DeobfuscateOptions::default())
+            .unwrap();
         assert!(result.modified);
         assert_eq!(result.code, "alert(1);\n");
     }
@@ -420,7 +469,9 @@ mod resolve_jsfuck_primitives {
     fn test_array_index_access() {
         let code = r#"["a", "b", "c"][+!+[]]"#;
         let restringer = Restringer::default();
-        let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
+        let result = restringer
+            .deobfuscate(code, DeobfuscateOptions::default())
+            .unwrap();
         assert!(result.modified);
         assert!(result.code.contains("\"b\""));
     }
@@ -429,11 +480,17 @@ mod resolve_jsfuck_primitives {
     fn test_string_concatenation() {
         let code = r#"(![]+[])[+[]]+(![]+[])[+!+[]]"#;
         let restringer = Restringer::default();
-        let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
+        let result = restringer
+            .deobfuscate(code, DeobfuscateOptions::default())
+            .unwrap();
         assert!(result.modified);
         // Should resolve to "f" + "a" = "fa"
         // Due to iteration limits, check that it at least partially deobfuscated
-        assert!(result.code.contains("false") || result.code.contains("\"f\"") || result.code.contains("\"fa\""));
+        assert!(
+            result.code.contains("false")
+                || result.code.contains("\"f\"")
+                || result.code.contains("\"fa\"")
+        );
     }
 
     #[test]
@@ -449,7 +506,11 @@ mod resolve_jsfuck_primitives {
         let code = r#""false"[0]"#;
         let result = apply_module_to_code_looped(code, Box::new(ResolveJSFuckPrimitives));
         // Should simplify to "f" (may have parentheses from codegen)
-        assert!(result.contains("\"f\""), "Expected result to contain '\"f\"', got: {}", result);
+        assert!(
+            result.contains("\"f\""),
+            "Expected result to contain '\"f\"', got: {}",
+            result
+        );
     }
 }
 
@@ -511,5 +572,42 @@ mod resolve_builtin_string_calls {
         let expected = "x.charAt(0);\n";
         let result = apply_module_to_code(code, Box::new(ResolveBuiltinStringCalls));
         assert_transform("ResolveBuiltinStringCalls", code, expected, &result);
+    }
+}
+
+#[cfg(test)]
+mod inline_paired_array_pushes {
+    use super::*;
+
+    #[test]
+    fn tp_1_inline_alternating_literal_key_pushes() {
+        let code = r#"var keys = []; var values = []; keys.push("host"); values.push(hostname); keys.push("email"); values.push(emailValue); var payload = serializeKeysValues(keys, values);"#;
+        let expected = "var keys = [\"host\", \"email\"];\nvar values = [hostname, emailValue];\nvar payload = serializeKeysValues(keys, values);\n";
+        let result = apply_module_to_code(code, Box::new(InlinePairedArrayPushes));
+        assert_transform("InlinePairedArrayPushes", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_2_inline_literal_push_and_spread_push() {
+        let code = r#"var values = []; values.push(1, "two"); values.push(...[true, null]);"#;
+        let expected = "var values = [\n\t1,\n\t\"two\",\n\ttrue,\n\tnull\n];\n";
+        let result = apply_module_to_code(code, Box::new(InlinePairedArrayPushes));
+        assert_transform("InlinePairedArrayPushes", code, expected, &result);
+    }
+
+    #[test]
+    fn tp_3_inline_literal_unshift_and_push() {
+        let code = r#"var values = []; values.push(3); values.unshift(1, 2); values.unshift(0);"#;
+        let expected = "var values = [\n\t0,\n\t1,\n\t2,\n\t3\n];\n";
+        let result = apply_module_to_code(code, Box::new(InlinePairedArrayPushes));
+        assert_transform("InlinePairedArrayPushes", code, expected, &result);
+    }
+
+    #[test]
+    fn tn_1_do_not_inline_non_literal_keys() {
+        let code = "var keys = []; var values = []; keys.push(key); values.push(value); keys.push(otherKey); values.push(otherValue);";
+        let expected = "var keys = [];\nvar values = [];\nkeys.push(key);\nvalues.push(value);\nkeys.push(otherKey);\nvalues.push(otherValue);\n";
+        let result = apply_module_to_code(code, Box::new(InlinePairedArrayPushes));
+        assert_transform("InlinePairedArrayPushes", code, expected, &result);
     }
 }

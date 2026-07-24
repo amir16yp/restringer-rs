@@ -13,7 +13,10 @@ impl Transform for ReplaceCallExpressionsWithUnwrappedIdentifier {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -42,20 +45,31 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn return_expr_from_function_body<'b>(&self, body: &'b FunctionBody<'a>) -> Option<&'b Expression<'a>> {
+    fn return_expr_from_function_body<'b>(
+        &self,
+        body: &'b FunctionBody<'a>,
+    ) -> Option<&'b Expression<'a>> {
         if body.statements.len() != 1 {
             return None;
         }
         match &body.statements[0] {
             Statement::ReturnStatement(ret) => {
                 let arg = ret.argument.as_ref()?;
-                if self.is_unwrappable(arg) { Some(arg) } else { None }
+                if self.is_unwrappable(arg) {
+                    Some(arg)
+                } else {
+                    None
+                }
             }
             // OXC may represent expression-bodied arrow functions as a FunctionBody
             // with a single ExpressionStatement.
             Statement::ExpressionStatement(es) => {
                 let expr = &es.expression;
-                if self.is_unwrappable(expr) { Some(expr) } else { None }
+                if self.is_unwrappable(expr) {
+                    Some(expr)
+                } else {
+                    None
+                }
             }
             _ => None,
         }
@@ -66,12 +80,18 @@ impl<'a> Visitor<'a> {
         self.return_expr_from_function_body(body)
     }
 
-    fn return_expr_from_arrow<'b>(&self, arrow: &'b ArrowFunctionExpression<'a>) -> Option<&'b Expression<'a>> {
+    fn return_expr_from_arrow<'b>(
+        &self,
+        arrow: &'b ArrowFunctionExpression<'a>,
+    ) -> Option<&'b Expression<'a>> {
         // oxc represents arrow function bodies as a FunctionBody.
         self.return_expr_from_function_body(&arrow.body)
     }
 
-    fn candidate_from_statement<'b>(&self, stmt: &'b Statement<'a>) -> Option<(&'b str, Expression<'a>)> {
+    fn candidate_from_statement<'b>(
+        &self,
+        stmt: &'b Statement<'a>,
+    ) -> Option<(&'b str, Expression<'a>)> {
         match stmt {
             Statement::FunctionDeclaration(func_decl) => {
                 let func = &**func_decl;
@@ -81,8 +101,12 @@ impl<'a> Visitor<'a> {
             }
             Statement::VariableDeclaration(var_decl) => {
                 for decl in &var_decl.declarations {
-                    let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue; };
-                    let Some(init) = decl.init.as_ref() else { continue; };
+                    let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                        continue;
+                    };
+                    let Some(init) = decl.init.as_ref() else {
+                        continue;
+                    };
 
                     let ret_expr = match self.unwrap_parens(init) {
                         Expression::FunctionExpression(f) => self.return_expr_from_function(f),
@@ -98,16 +122,23 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn replace_calls_in_statement_list(&mut self, stmts: &mut oxc_allocator::Vec<'a, Statement<'a>>) {
+    fn replace_calls_in_statement_list(
+        &mut self,
+        stmts: &mut oxc_allocator::Vec<'a, Statement<'a>>,
+    ) {
         // Find at most one candidate per pass (like other transforms here), then apply replacements.
         let mut candidate: Option<(String, Expression<'a>)> = None;
         for stmt in stmts.iter() {
-            let Some((name, replacement)) = self.candidate_from_statement(stmt) else { continue; };
+            let Some((name, replacement)) = self.candidate_from_statement(stmt) else {
+                continue;
+            };
             candidate = Some((name.to_string(), replacement));
             break;
         }
 
-        let Some((name, replacement)) = candidate else { return; };
+        let Some((name, replacement)) = candidate else {
+            return;
+        };
         let mut replaced_any = false;
         for s in stmts.iter_mut() {
             if self.replace_calls_in_statement_in_place(&name, &replacement, s) {
@@ -120,7 +151,12 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn replace_calls_in_statement_in_place(&self, func_name: &str, replacement: &Expression<'a>, stmt: &mut Statement<'a>) -> bool {
+    fn replace_calls_in_statement_in_place(
+        &self,
+        func_name: &str,
+        replacement: &Expression<'a>,
+        stmt: &mut Statement<'a>,
+    ) -> bool {
         struct Replacer<'a, 'b> {
             allocator: &'a oxc_allocator::Allocator,
             func_name: &'b str,
@@ -156,7 +192,12 @@ impl<'a> Visitor<'a> {
             }
         }
 
-        let mut r = Replacer { allocator: self.allocator, func_name, replacement, replaced_any: false };
+        let mut r = Replacer {
+            allocator: self.allocator,
+            func_name,
+            replacement,
+            replaced_any: false,
+        };
         r.visit_statement(stmt);
         r.replaced_any
     }

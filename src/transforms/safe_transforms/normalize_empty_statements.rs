@@ -24,7 +24,8 @@ struct Visitor {
 impl<'a> VisitMut<'a> for Visitor {
     fn visit_program(&mut self, it: &mut Program<'a>) {
         let before = it.body.len();
-        it.body.retain(|stmt| !matches!(stmt, Statement::EmptyStatement(_)));
+        it.body
+            .retain(|stmt| !matches!(stmt, Statement::EmptyStatement(_)));
         if it.body.len() != before {
             self.modified = true;
         }
@@ -33,7 +34,8 @@ impl<'a> VisitMut<'a> for Visitor {
 
     fn visit_function_body(&mut self, it: &mut FunctionBody<'a>) {
         let before = it.statements.len();
-        it.statements.retain(|stmt| !matches!(stmt, Statement::EmptyStatement(_)));
+        it.statements
+            .retain(|stmt| !matches!(stmt, Statement::EmptyStatement(_)));
         if it.statements.len() != before {
             self.modified = true;
         }
@@ -42,7 +44,8 @@ impl<'a> VisitMut<'a> for Visitor {
 
     fn visit_block_statement(&mut self, it: &mut BlockStatement<'a>) {
         let before = it.body.len();
-        it.body.retain(|stmt| !matches!(stmt, Statement::EmptyStatement(_)));
+        it.body
+            .retain(|stmt| !matches!(stmt, Statement::EmptyStatement(_)));
         if it.body.len() != before {
             self.modified = true;
         }

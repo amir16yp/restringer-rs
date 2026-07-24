@@ -75,18 +75,31 @@ impl<'a> Visitor<'a> {
     fn key_from_member_expr(mem: &Expression<'a>) -> Option<(String, PropKey)> {
         match mem {
             Expression::StaticMemberExpression(s) => {
-                let Expression::Identifier(obj) = &s.object else { return None };
-                Some((obj.name.as_str().to_string(), Self::prop_key_from_static(s)?))
+                let Expression::Identifier(obj) = &s.object else {
+                    return None;
+                };
+                Some((
+                    obj.name.as_str().to_string(),
+                    Self::prop_key_from_static(s)?,
+                ))
             }
             Expression::ComputedMemberExpression(c) => {
-                let Expression::Identifier(obj) = &c.object else { return None };
-                Some((obj.name.as_str().to_string(), Self::prop_key_from_computed(c)?))
+                let Expression::Identifier(obj) = &c.object else {
+                    return None;
+                };
+                Some((
+                    obj.name.as_str().to_string(),
+                    Self::prop_key_from_computed(c)?,
+                ))
             }
             _ => None,
         }
     }
 
-    fn collect_modified_idents_in_statement_list(&self, stmts: &[Statement<'a>]) -> HashSet<String> {
+    fn collect_modified_idents_in_statement_list(
+        &self,
+        stmts: &[Statement<'a>],
+    ) -> HashSet<String> {
         let mut out = HashSet::new();
         for stmt in stmts {
             self.collect_modified_idents_in_statement(stmt, &mut out);
@@ -94,7 +107,10 @@ impl<'a> Visitor<'a> {
         out
     }
 
-    fn collect_declared_idents_in_statement_list(&self, stmts: &[Statement<'a>]) -> HashSet<String> {
+    fn collect_declared_idents_in_statement_list(
+        &self,
+        stmts: &[Statement<'a>],
+    ) -> HashSet<String> {
         let mut out = HashSet::new();
         for stmt in stmts {
             self.collect_declared_idents_in_statement(stmt, &mut out);
@@ -102,7 +118,11 @@ impl<'a> Visitor<'a> {
         out
     }
 
-    fn collect_declared_idents_in_statement(&self, stmt: &Statement<'a>, out: &mut HashSet<String>) {
+    fn collect_declared_idents_in_statement(
+        &self,
+        stmt: &Statement<'a>,
+        out: &mut HashSet<String>,
+    ) {
         match stmt {
             Statement::VariableDeclaration(var_decl) => {
                 for decl in &var_decl.declarations {
@@ -125,9 +145,15 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn collect_modified_idents_in_statement(&self, stmt: &Statement<'a>, out: &mut HashSet<String>) {
+    fn collect_modified_idents_in_statement(
+        &self,
+        stmt: &Statement<'a>,
+        out: &mut HashSet<String>,
+    ) {
         match stmt {
-            Statement::ExpressionStatement(es) => self.collect_modified_idents_in_expression(&es.expression, out),
+            Statement::ExpressionStatement(es) => {
+                self.collect_modified_idents_in_expression(&es.expression, out)
+            }
             Statement::ReturnStatement(rs) => {
                 if let Some(arg) = rs.argument.as_ref() {
                     self.collect_modified_idents_in_expression(arg, out);
@@ -196,7 +222,11 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn collect_modified_idents_in_expression(&self, expr: &Expression<'a>, out: &mut HashSet<String>) {
+    fn collect_modified_idents_in_expression(
+        &self,
+        expr: &Expression<'a>,
+        out: &mut HashSet<String>,
+    ) {
         match expr {
             Expression::AssignmentExpression(a) => {
                 if let AssignmentTarget::AssignmentTargetIdentifier(id) = &a.left {
@@ -248,7 +278,9 @@ impl<'a> Visitor<'a> {
                 self.collect_modified_idents_in_expression(&c.consequent, out);
                 self.collect_modified_idents_in_expression(&c.alternate, out);
             }
-            Expression::ParenthesizedExpression(p) => self.collect_modified_idents_in_expression(&p.expression, out),
+            Expression::ParenthesizedExpression(p) => {
+                self.collect_modified_idents_in_expression(&p.expression, out)
+            }
             Expression::ArrayExpression(arr) => {
                 for el in &arr.elements {
                     if let Some(expr) = el.as_expression() {
@@ -272,17 +304,28 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn collect_candidates_from_statement_list(&self, stmts: &[Statement<'a>]) -> HashMap<(String, PropKey), Expression<'a>> {
+    fn collect_candidates_from_statement_list(
+        &self,
+        stmts: &[Statement<'a>],
+    ) -> HashMap<(String, PropKey), Expression<'a>> {
         let mut candidates: HashMap<(String, PropKey), Expression<'a>> = HashMap::new();
         let mut member_assignment_count: HashMap<(String, PropKey), usize> = HashMap::new();
         let mut member_modified: HashSet<(String, PropKey)> = HashSet::new();
 
         for stmt in stmts {
-            self.collect_candidates_from_statement(stmt, &mut candidates, &mut member_assignment_count, &mut member_modified);
+            self.collect_candidates_from_statement(
+                stmt,
+                &mut candidates,
+                &mut member_assignment_count,
+                &mut member_modified,
+            );
         }
 
         // Only allow entries assigned exactly once, and never updated/modified otherwise.
-        candidates.retain(|k, _| member_assignment_count.get(k).copied().unwrap_or(0) == 1 && !member_modified.contains(k));
+        candidates.retain(|k, _| {
+            member_assignment_count.get(k).copied().unwrap_or(0) == 1
+                && !member_modified.contains(k)
+        });
         candidates
     }
 
@@ -302,57 +345,147 @@ impl<'a> Visitor<'a> {
             ),
             Statement::ReturnStatement(rs) => {
                 if let Some(arg) = rs.argument.as_ref() {
-                    self.collect_candidates_from_expression(arg, candidates, member_assignment_count, member_modified);
+                    self.collect_candidates_from_expression(
+                        arg,
+                        candidates,
+                        member_assignment_count,
+                        member_modified,
+                    );
                 }
             }
             Statement::VariableDeclaration(var_decl) => {
                 for decl in &var_decl.declarations {
                     if let Some(init) = decl.init.as_ref() {
-                        self.collect_candidates_from_expression(init, candidates, member_assignment_count, member_modified);
+                        self.collect_candidates_from_expression(
+                            init,
+                            candidates,
+                            member_assignment_count,
+                            member_modified,
+                        );
                     }
                 }
             }
             Statement::BlockStatement(block) => {
                 for s in &block.body {
-                    self.collect_candidates_from_statement(s, candidates, member_assignment_count, member_modified);
+                    self.collect_candidates_from_statement(
+                        s,
+                        candidates,
+                        member_assignment_count,
+                        member_modified,
+                    );
                 }
             }
             Statement::IfStatement(ifstmt) => {
-                self.collect_candidates_from_expression(&ifstmt.test, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_statement(&ifstmt.consequent, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &ifstmt.test,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_statement(
+                    &ifstmt.consequent,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
                 if let Some(alt) = ifstmt.alternate.as_ref() {
-                    self.collect_candidates_from_statement(alt, candidates, member_assignment_count, member_modified);
+                    self.collect_candidates_from_statement(
+                        alt,
+                        candidates,
+                        member_assignment_count,
+                        member_modified,
+                    );
                 }
             }
             Statement::WhileStatement(ws) => {
-                self.collect_candidates_from_expression(&ws.test, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_statement(&ws.body, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &ws.test,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_statement(
+                    &ws.body,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Statement::DoWhileStatement(ws) => {
-                self.collect_candidates_from_statement(&ws.body, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_expression(&ws.test, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_statement(
+                    &ws.body,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_expression(
+                    &ws.test,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Statement::ForStatement(fs) => {
                 if let Some(init) = fs.init.as_ref() {
                     if let Some(e) = init.as_expression() {
-                        self.collect_candidates_from_expression(e, candidates, member_assignment_count, member_modified);
+                        self.collect_candidates_from_expression(
+                            e,
+                            candidates,
+                            member_assignment_count,
+                            member_modified,
+                        );
                     }
                 }
                 if let Some(test) = fs.test.as_ref() {
-                    self.collect_candidates_from_expression(test, candidates, member_assignment_count, member_modified);
+                    self.collect_candidates_from_expression(
+                        test,
+                        candidates,
+                        member_assignment_count,
+                        member_modified,
+                    );
                 }
                 if let Some(update) = fs.update.as_ref() {
-                    self.collect_candidates_from_expression(update, candidates, member_assignment_count, member_modified);
+                    self.collect_candidates_from_expression(
+                        update,
+                        candidates,
+                        member_assignment_count,
+                        member_modified,
+                    );
                 }
-                self.collect_candidates_from_statement(&fs.body, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_statement(
+                    &fs.body,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Statement::ForInStatement(for_in) => {
-                self.collect_candidates_from_expression(&for_in.right, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_statement(&for_in.body, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &for_in.right,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_statement(
+                    &for_in.body,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Statement::ForOfStatement(for_of) => {
-                self.collect_candidates_from_expression(&for_of.right, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_statement(&for_of.body, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &for_of.right,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_statement(
+                    &for_of.body,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             _ => {}
         }
@@ -375,7 +508,9 @@ impl<'a> Visitor<'a> {
                             *member_assignment_count.entry(key.clone()).or_insert(0) += 1;
 
                             if Self::is_literal_expr(&a.right) {
-                                candidates.entry(key).or_insert_with(|| a.right.clone_in(self.allocator));
+                                candidates
+                                    .entry(key)
+                                    .or_insert_with(|| a.right.clone_in(self.allocator));
                             }
                         }
                     }
@@ -387,76 +522,176 @@ impl<'a> Visitor<'a> {
                             *member_assignment_count.entry(key.clone()).or_insert(0) += 1;
 
                             if Self::is_literal_expr(&a.right) {
-                                candidates.entry(key).or_insert_with(|| a.right.clone_in(self.allocator));
+                                candidates
+                                    .entry(key)
+                                    .or_insert_with(|| a.right.clone_in(self.allocator));
                             }
                         }
                     }
                 }
 
-                self.collect_candidates_from_expression(&a.right, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &a.right,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::UpdateExpression(u) => {
                 // Any update on member expression => don't resolve that member.
                 match &u.argument {
                     SimpleAssignmentTarget::ComputedMemberExpression(mem) => {
-                        let Expression::Identifier(obj) = &mem.object else { return };
-                        let Some(prop_key) = Self::prop_key_from_computed(mem) else { return };
+                        let Expression::Identifier(obj) = &mem.object else {
+                            return;
+                        };
+                        let Some(prop_key) = Self::prop_key_from_computed(mem) else {
+                            return;
+                        };
                         member_modified.insert((obj.name.as_str().to_string(), prop_key));
                     }
                     SimpleAssignmentTarget::StaticMemberExpression(mem) => {
-                        let Expression::Identifier(obj) = &mem.object else { return };
-                        let Some(prop_key) = Self::prop_key_from_static(mem) else { return };
+                        let Expression::Identifier(obj) = &mem.object else {
+                            return;
+                        };
+                        let Some(prop_key) = Self::prop_key_from_static(mem) else {
+                            return;
+                        };
                         member_modified.insert((obj.name.as_str().to_string(), prop_key));
                     }
                     _ => {}
                 }
             }
             Expression::CallExpression(call) => {
-                self.collect_candidates_from_expression(&call.callee, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &call.callee,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
                 for a in &call.arguments {
                     if let Some(e) = a.as_expression() {
-                        self.collect_candidates_from_expression(e, candidates, member_assignment_count, member_modified);
+                        self.collect_candidates_from_expression(
+                            e,
+                            candidates,
+                            member_assignment_count,
+                            member_modified,
+                        );
                     }
                 }
             }
             Expression::ComputedMemberExpression(c) => {
-                self.collect_candidates_from_expression(&c.object, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_expression(&c.expression, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &c.object,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_expression(
+                    &c.expression,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::StaticMemberExpression(s) => {
-                self.collect_candidates_from_expression(&s.object, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &s.object,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::PrivateFieldExpression(p) => {
-                self.collect_candidates_from_expression(&p.object, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &p.object,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::SequenceExpression(seq) => {
                 for e in &seq.expressions {
-                    self.collect_candidates_from_expression(e, candidates, member_assignment_count, member_modified);
+                    self.collect_candidates_from_expression(
+                        e,
+                        candidates,
+                        member_assignment_count,
+                        member_modified,
+                    );
                 }
             }
             Expression::BinaryExpression(bin) => {
-                self.collect_candidates_from_expression(&bin.left, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_expression(&bin.right, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &bin.left,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_expression(
+                    &bin.right,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::LogicalExpression(log) => {
-                self.collect_candidates_from_expression(&log.left, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_expression(&log.right, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &log.left,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_expression(
+                    &log.right,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::UnaryExpression(un) => {
-                self.collect_candidates_from_expression(&un.argument, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &un.argument,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::ConditionalExpression(c) => {
-                self.collect_candidates_from_expression(&c.test, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_expression(&c.consequent, candidates, member_assignment_count, member_modified);
-                self.collect_candidates_from_expression(&c.alternate, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &c.test,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_expression(
+                    &c.consequent,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
+                self.collect_candidates_from_expression(
+                    &c.alternate,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::ParenthesizedExpression(p) => {
-                self.collect_candidates_from_expression(&p.expression, candidates, member_assignment_count, member_modified);
+                self.collect_candidates_from_expression(
+                    &p.expression,
+                    candidates,
+                    member_assignment_count,
+                    member_modified,
+                );
             }
             Expression::ArrayExpression(arr) => {
                 for el in &arr.elements {
                     if let Some(expr) = el.as_expression() {
-                        self.collect_candidates_from_expression(expr, candidates, member_assignment_count, member_modified);
+                        self.collect_candidates_from_expression(
+                            expr,
+                            candidates,
+                            member_assignment_count,
+                            member_modified,
+                        );
                     }
                 }
             }
@@ -464,10 +699,20 @@ impl<'a> Visitor<'a> {
                 for prop in &obj.properties {
                     match prop {
                         ObjectPropertyKind::ObjectProperty(p) => {
-                            self.collect_candidates_from_expression(&p.value, candidates, member_assignment_count, member_modified);
+                            self.collect_candidates_from_expression(
+                                &p.value,
+                                candidates,
+                                member_assignment_count,
+                                member_modified,
+                            );
                         }
                         ObjectPropertyKind::SpreadProperty(s) => {
-                            self.collect_candidates_from_expression(&s.argument, candidates, member_assignment_count, member_modified);
+                            self.collect_candidates_from_expression(
+                                &s.argument,
+                                candidates,
+                                member_assignment_count,
+                                member_modified,
+                            );
                         }
                     }
                 }
@@ -554,7 +799,10 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'a>) {
-        if matches!(it, Expression::StaticMemberExpression(_) | Expression::ComputedMemberExpression(_)) {
+        if matches!(
+            it,
+            Expression::StaticMemberExpression(_) | Expression::ComputedMemberExpression(_)
+        ) {
             if let Some(repl) = self.try_replace_member_expression(it) {
                 *it = repl;
                 self.modified = true;

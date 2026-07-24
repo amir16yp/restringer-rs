@@ -14,7 +14,9 @@ pub struct ResolveMemberExpressionsLocalReferences {
 
 impl ResolveMemberExpressionsLocalReferences {
     pub fn new() -> Self {
-        Self { evaluator: JsEvaluator::new() }
+        Self {
+            evaluator: JsEvaluator::new(),
+        }
     }
 }
 
@@ -78,7 +80,9 @@ impl Transform for ResolveMemberExpressionsLocalReferences {
         }
         let context_code = context_parts.join(";\n");
 
-        let mut collector = SkipSpanCollector { skip_spans: HashSet::new() };
+        let mut collector = SkipSpanCollector {
+            skip_spans: HashSet::new(),
+        };
         collector.visit_program(program);
 
         let mut visitor = LocalReferenceVisitor {
@@ -106,21 +110,34 @@ struct SkipSpanCollector {
 
 impl<'a> Visit<'a> for SkipSpanCollector {
     fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
-        if matches!(&it.callee, Expression::StaticMemberExpression(_) | Expression::ComputedMemberExpression(_) | Expression::PrivateFieldExpression(_)) {
+        if matches!(
+            &it.callee,
+            Expression::StaticMemberExpression(_)
+                | Expression::ComputedMemberExpression(_)
+                | Expression::PrivateFieldExpression(_)
+        ) {
             self.skip_spans.insert(it.callee.span());
         }
         oxc_ast_visit::walk::walk_call_expression(self, it);
     }
 
     fn visit_update_expression(&mut self, it: &UpdateExpression<'a>) {
-        if matches!(&it.argument, SimpleAssignmentTarget::StaticMemberExpression(_) | SimpleAssignmentTarget::ComputedMemberExpression(_)) {
+        if matches!(
+            &it.argument,
+            SimpleAssignmentTarget::StaticMemberExpression(_)
+                | SimpleAssignmentTarget::ComputedMemberExpression(_)
+        ) {
             self.skip_spans.insert(it.argument.span());
         }
         oxc_ast_visit::walk::walk_update_expression(self, it);
     }
 
     fn visit_assignment_expression(&mut self, it: &AssignmentExpression<'a>) {
-        if matches!(&it.left, AssignmentTarget::StaticMemberExpression(_) | AssignmentTarget::ComputedMemberExpression(_)) {
+        if matches!(
+            &it.left,
+            AssignmentTarget::StaticMemberExpression(_)
+                | AssignmentTarget::ComputedMemberExpression(_)
+        ) {
             self.skip_spans.insert(it.left.span());
         }
         oxc_ast_visit::walk::walk_assignment_expression(self, it);
@@ -149,7 +166,9 @@ impl<'a, 'b> LocalReferenceVisitor<'a, 'b> {
 
         let (object, prop_name) = match expr {
             Expression::StaticMemberExpression(s) => (&s.object, Some(s.property.name.as_str())),
-            Expression::ComputedMemberExpression(c) => (&c.object, computed_property_name(&c.expression)),
+            Expression::ComputedMemberExpression(c) => {
+                (&c.object, computed_property_name(&c.expression))
+            }
             _ => return,
         };
 
@@ -175,7 +194,9 @@ impl<'a, 'b> LocalReferenceVisitor<'a, 'b> {
 
         match self.transform.evaluator().eval_to_json(&full_code) {
             Ok(json) => {
-                if let Some(new_expr) = super::helpers::parse_expression_in(self.allocator, &json, expr.span()) {
+                if let Some(new_expr) =
+                    super::helpers::parse_expression_in(self.allocator, &json, expr.span())
+                {
                     if !is_empty_replacement(&new_expr) {
                         *expr = new_expr;
                         self.modified = true;
@@ -197,7 +218,9 @@ impl<'a, 'b> VisitMut<'a> for LocalReferenceVisitor<'a, 'b> {
 fn computed_property_name<'a>(expr: &'a Expression<'a>) -> Option<&'a str> {
     match expr {
         Expression::StringLiteral(s) => Some(s.value.as_str()),
-        Expression::NumericLiteral(_) | Expression::BooleanLiteral(_) | Expression::NullLiteral(_) => Some(""),
+        Expression::NumericLiteral(_)
+        | Expression::BooleanLiteral(_)
+        | Expression::NullLiteral(_) => Some(""),
         _ => None,
     }
 }

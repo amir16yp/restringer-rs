@@ -14,7 +14,10 @@ impl Transform for ReplaceSequencesWithExpressions {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -34,14 +37,22 @@ impl<'a> Visitor<'a> {
         let mut out = ArenaVec::new_in(self.allocator);
         for expr in &seq.expressions {
             out.push(Statement::ExpressionStatement(ArenaBox::new_in(
-                ExpressionStatement { node_id: Cell::new(NodeId::DUMMY), span, expression: expr.clone_in(self.allocator) },
+                ExpressionStatement {
+                    node_id: Cell::new(NodeId::DUMMY),
+                    span,
+                    expression: expr.clone_in(self.allocator),
+                },
                 self.allocator,
             )));
         }
         out
     }
 
-    fn transform_statement_in_list(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+    fn transform_statement_in_list(
+        &mut self,
+        stmt: Statement<'a>,
+        out: &mut ArenaVec<'a, Statement<'a>>,
+    ) {
         if let Statement::ExpressionStatement(expr_stmt) = &stmt {
             if let Expression::SequenceExpression(seq) = &expr_stmt.expression {
                 if seq.expressions.len() > 1 {
@@ -68,15 +79,24 @@ impl<'a> Visitor<'a> {
     }
 
     fn maybe_wrap_sequence_statement(&mut self, stmt: &mut Statement<'a>) {
-        let Statement::ExpressionStatement(expr_stmt) = stmt else { return; };
-        let Expression::SequenceExpression(seq) = &expr_stmt.expression else { return; };
+        let Statement::ExpressionStatement(expr_stmt) = stmt else {
+            return;
+        };
+        let Expression::SequenceExpression(seq) = &expr_stmt.expression else {
+            return;
+        };
         if seq.expressions.len() <= 1 {
             return;
         }
 
         let body = self.seq_to_expression_statements(expr_stmt.span, seq);
         *stmt = Statement::BlockStatement(ArenaBox::new_in(
-            BlockStatement { node_id: Cell::new(NodeId::DUMMY), span: expr_stmt.span, body, scope_id: Default::default() },
+            BlockStatement {
+                node_id: Cell::new(NodeId::DUMMY),
+                span: expr_stmt.span,
+                body,
+                scope_id: Default::default(),
+            },
             self.allocator,
         ));
         self.modified = true;

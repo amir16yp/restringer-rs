@@ -15,7 +15,10 @@ impl Transform for RearrangeSequences {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -27,7 +30,11 @@ struct Visitor<'a> {
 }
 
 impl<'a> Visitor<'a> {
-    fn split_sequence_to_statements(&self, span: Span, seq: &SequenceExpression<'a>) -> (ArenaVec<'a, Statement<'a>>, Expression<'a>) {
+    fn split_sequence_to_statements(
+        &self,
+        span: Span,
+        seq: &SequenceExpression<'a>,
+    ) -> (ArenaVec<'a, Statement<'a>>, Expression<'a>) {
         let mut extracted = ArenaVec::new_in(self.allocator);
         let last_idx = seq.expressions.len().saturating_sub(1);
         for (i, expr) in seq.expressions.iter().enumerate() {
@@ -35,7 +42,11 @@ impl<'a> Visitor<'a> {
                 break;
             }
             extracted.push(Statement::ExpressionStatement(ArenaBox::new_in(
-                ExpressionStatement { node_id: Cell::new(NodeId::DUMMY), span, expression: expr.clone_in(self.allocator) },
+                ExpressionStatement {
+                    node_id: Cell::new(NodeId::DUMMY),
+                    span,
+                    expression: expr.clone_in(self.allocator),
+                },
                 self.allocator,
             )));
         }
@@ -44,22 +55,36 @@ impl<'a> Visitor<'a> {
             .get(last_idx)
             .map(|e| e.clone_in(self.allocator))
             .unwrap_or_else(|| {
-                Expression::NullLiteral(ArenaBox::new_in(NullLiteral { node_id: Cell::new(NodeId::DUMMY), span }, self.allocator))
+                Expression::NullLiteral(ArenaBox::new_in(
+                    NullLiteral {
+                        node_id: Cell::new(NodeId::DUMMY),
+                        span,
+                    },
+                    self.allocator,
+                ))
             });
         (extracted, last_expr)
     }
 
-    fn transform_statement_in_list(&mut self, stmt: Statement<'a>, out: &mut ArenaVec<'a, Statement<'a>>) {
+    fn transform_statement_in_list(
+        &mut self,
+        stmt: Statement<'a>,
+        out: &mut ArenaVec<'a, Statement<'a>>,
+    ) {
         match stmt {
             Statement::ReturnStatement(ret) => {
                 if let Some(Expression::SequenceExpression(seq)) = ret.argument.as_ref() {
-                    let (mut extracted, last_expr) = self.split_sequence_to_statements(ret.span, seq);
+                    let (mut extracted, last_expr) =
+                        self.split_sequence_to_statements(ret.span, seq);
                     for s in extracted.drain(..) {
                         out.push(s);
                     }
                     let mut new_ret = (*ret).clone_in(self.allocator);
                     new_ret.argument = Some(last_expr);
-                    out.push(Statement::ReturnStatement(ArenaBox::new_in(new_ret, self.allocator)));
+                    out.push(Statement::ReturnStatement(ArenaBox::new_in(
+                        new_ret,
+                        self.allocator,
+                    )));
                     self.modified = true;
                     return;
                 }
@@ -67,13 +92,17 @@ impl<'a> Visitor<'a> {
             }
             Statement::IfStatement(if_stmt) => {
                 if let Expression::SequenceExpression(seq) = &if_stmt.test {
-                    let (mut extracted, last_expr) = self.split_sequence_to_statements(if_stmt.span, seq);
+                    let (mut extracted, last_expr) =
+                        self.split_sequence_to_statements(if_stmt.span, seq);
                     for s in extracted.drain(..) {
                         out.push(s);
                     }
                     let mut new_if = (*if_stmt).clone_in(self.allocator);
                     new_if.test = last_expr;
-                    out.push(Statement::IfStatement(ArenaBox::new_in(new_if, self.allocator)));
+                    out.push(Statement::IfStatement(ArenaBox::new_in(
+                        new_if,
+                        self.allocator,
+                    )));
                     self.modified = true;
                     return;
                 }

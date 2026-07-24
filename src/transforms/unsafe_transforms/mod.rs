@@ -1,25 +1,26 @@
-pub mod helpers;
-pub mod engine;
-#[cfg(feature = "unsafe-transform-quickjs")]
-pub mod quickjs_engine;
 #[cfg(feature = "unsafe-transform-deno")]
 pub mod deno_engine;
-pub mod js_runtime;
-pub mod unsafe_transform;
+pub mod engine;
 pub mod eval_constant_expressions;
-pub mod resolve_local_calls;
+pub mod helpers;
+pub mod js_runtime;
+#[cfg(feature = "unsafe-transform-quickjs")]
+pub mod quickjs_engine;
 pub mod resolve_augmented_function_wrapped_array_replacements;
 pub mod resolve_builtin_calls;
-pub mod resolve_eval_calls_on_non_literals;
-pub mod resolve_injected_prototype_method_calls;
 pub mod resolve_definite_binary_expressions;
 pub mod resolve_definite_member_expressions;
 pub mod resolve_deterministic_conditional_expressions;
+pub mod resolve_eval_calls_on_non_literals;
+pub mod resolve_injected_prototype_method_calls;
+pub mod resolve_literal_iife_results;
+pub mod resolve_local_calls;
 pub mod resolve_member_expressions_local_references;
 pub mod resolve_minimal_alphabet;
-pub mod resolve_literal_iife_results;
+pub mod resolve_packed_eval_calls;
+pub mod unsafe_transform;
 
-pub use engine::{set_default_engine, Engine, JsEvaluator};
+pub use engine::{Engine, JsEvaluator, set_default_engine};
 pub use eval_constant_expressions::EvalConstantExpressions;
 pub use resolve_augmented_function_wrapped_array_replacements::ResolveAugmentedFunctionWrappedArrayReplacements;
 pub use resolve_builtin_calls::ResolveBuiltinCalls;
@@ -32,4 +33,5 @@ pub use resolve_literal_iife_results::ResolveLiteralIifeResults;
 pub use resolve_local_calls::ResolveLocalCalls;
 pub use resolve_member_expressions_local_references::ResolveMemberExpressionsLocalReferences;
 pub use resolve_minimal_alphabet::ResolveMinimalAlphabet;
+pub use resolve_packed_eval_calls::ResolvePackedEvalCalls;
 pub use unsafe_transform::{UnsafeTransform, UnsafeTransformHelper};

@@ -16,7 +16,11 @@ impl Transform for ResolveProxyCalls {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, map: HashMap::new(), modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            map: HashMap::new(),
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -32,9 +36,13 @@ struct Visitor<'a> {
 impl<'a> Visitor<'a> {
     fn collect_proxy_functions_from_statements(&mut self, stmts: &[Statement<'a>]) {
         for stmt in stmts {
-            let Statement::FunctionDeclaration(func) = stmt else { continue; };
+            let Statement::FunctionDeclaration(func) = stmt else {
+                continue;
+            };
             let f = &**func;
-            let Some(id) = f.id.as_ref() else { continue; };
+            let Some(id) = f.id.as_ref() else {
+                continue;
+            };
             let name = id.name.as_str();
             if let Some(target) = Self::is_proxy_call(f) {
                 self.map.insert(name.to_string(), target.to_string());
@@ -48,19 +56,31 @@ impl<'a> Visitor<'a> {
             return None;
         }
 
-        let Statement::ReturnStatement(ret) = &body.statements[0] else { return None; };
+        let Statement::ReturnStatement(ret) = &body.statements[0] else {
+            return None;
+        };
         let arg = ret.argument.as_ref()?;
-        let Expression::CallExpression(call) = arg else { return None; };
-        let Expression::Identifier(target) = &call.callee else { return None; };
+        let Expression::CallExpression(call) = arg else {
+            return None;
+        };
+        let Expression::Identifier(target) = &call.callee else {
+            return None;
+        };
 
         // Parameters must be identifiers and passed through in exact order.
         if func.params.items.len() != call.arguments.len() {
             return None;
         }
         for (p, a) in func.params.items.iter().zip(call.arguments.iter()) {
-            let BindingPattern::BindingIdentifier(pat_id) = &p.pattern else { return None; };
-            let Some(arg_expr) = a.as_expression() else { return None; };
-            let Expression::Identifier(arg_id) = arg_expr else { return None; };
+            let BindingPattern::BindingIdentifier(pat_id) = &p.pattern else {
+                return None;
+            };
+            let Some(arg_expr) = a.as_expression() else {
+                return None;
+            };
+            let Expression::Identifier(arg_id) = arg_expr else {
+                return None;
+            };
             if pat_id.name.as_str() != arg_id.name.as_str() {
                 return None;
             }
@@ -72,7 +92,12 @@ impl<'a> Visitor<'a> {
     fn make_ident_expr(&self, span: oxc_span::Span, name: &str) -> Expression<'a> {
         let name = self.allocator.alloc_str(name);
         Expression::Identifier(ArenaBox::new_in(
-            IdentifierReference { node_id: Cell::new(NodeId::DUMMY), span, name: name.into(), reference_id: None.into() },
+            IdentifierReference {
+                node_id: Cell::new(NodeId::DUMMY),
+                span,
+                name: name.into(),
+                reference_id: None.into(),
+            },
             self.allocator,
         ))
     }

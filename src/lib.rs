@@ -1,4 +1,7 @@
-use std::{path::PathBuf, time::{Duration, Instant}};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use oxc_allocator::Allocator;
 use oxc_codegen::{Codegen, CodegenOptions, CodegenReturn, CommentOptions, IndentChar};
@@ -7,7 +10,7 @@ use oxc_span::SourceType;
 
 mod transforms;
 
-pub use transforms::unsafe_transforms::{set_default_engine, Engine};
+pub use transforms::unsafe_transforms::{Engine, set_default_engine};
 
 #[cfg(test)]
 mod tests;
@@ -32,6 +35,7 @@ impl Default for Restringer {
                 Box::new(transforms::safe_transforms::separate_chained_declarators::SeparateChainedDeclarators),
                 Box::new(transforms::safe_transforms::rearrange_switches::RearrangeSwitches),
                 Box::new(transforms::safe_transforms::normalize_empty_statements::NormalizeEmptyStatements),
+                Box::new(transforms::safe_transforms::inline_paired_array_pushes::InlinePairedArrayPushes),
                 Box::new(transforms::safe_transforms::remove_redundant_block_statements::RemoveRedundantBlockStatements),
                 Box::new(transforms::safe_transforms::resolve_redundant_logical_expressions::ResolveRedundantLogicalExpressions),
                 Box::new(transforms::safe_transforms::unwrap_simple_operations::UnwrapSimpleOperations),
@@ -102,6 +106,7 @@ impl Default for Restringer {
                 Box::new(transforms::unsafe_transforms::ResolveDeterministicConditionalExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveInjectedPrototypeMethodCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolveLocalCalls::new()),
+                Box::new(transforms::unsafe_transforms::ResolvePackedEvalCalls::new()),
                 Box::new(transforms::unsafe_transforms::ResolveEvalCallsOnNonLiterals::new()),
                 Box::new(transforms::unsafe_transforms::EvalConstantExpressions::new()),
                 Box::new(transforms::unsafe_transforms::ResolveLiteralIifeResults::new()),
@@ -146,7 +151,12 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::InvalidSourceType { path, message } => {
-                write!(f, "Failed to determine source type for {}: {}", path.display(), message)
+                write!(
+                    f,
+                    "Failed to determine source type for {}: {}",
+                    path.display(),
+                    message
+                )
             }
             Error::ParseFailed => write!(f, "Parsing failed"),
             Error::Timeout => write!(f, "Operation timed out"),
@@ -196,7 +206,11 @@ impl Restringer {
             normal: print_comments,
             jsdoc: print_comments,
             annotation: print_comments,
-            legal: if print_comments { oxc_codegen::LegalComment::Inline } else { oxc_codegen::LegalComment::None },
+            legal: if print_comments {
+                oxc_codegen::LegalComment::Inline
+            } else {
+                oxc_codegen::LegalComment::None
+            },
         };
     }
 
@@ -222,8 +236,10 @@ impl Restringer {
         let source_type = if let Some(st) = opts.source_type {
             st
         } else if let Some(path) = opts.filename_for_source_type.as_ref() {
-            SourceType::from_path(path)
-                .map_err(|e| Error::InvalidSourceType { path: path.clone(), message: e.to_string() })?
+            SourceType::from_path(path).map_err(|e| Error::InvalidSourceType {
+                path: path.clone(),
+                message: e.to_string(),
+            })?
         } else {
             SourceType::mjs()
         };
@@ -246,7 +262,11 @@ impl Restringer {
             for _ in 0..max_iterations {
                 check_timeout()?;
                 let mut modified_iter = false;
-                let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
+                let mut ctx = TransformCtx {
+                    allocator: &allocator,
+                    source_text,
+                    source_type,
+                };
                 for t in &modules {
                     check_timeout()?;
                     if t.run(&mut ctx, &mut program) {
@@ -278,7 +298,11 @@ impl Restringer {
         self.apply_modules_to_code(source_text, vec![module], opts)
     }
 
-    pub fn deobfuscate(&self, source_text: &str, opts: DeobfuscateOptions) -> Result<DeobfuscateResult, Error> {
+    pub fn deobfuscate(
+        &self,
+        source_text: &str,
+        opts: DeobfuscateOptions,
+    ) -> Result<DeobfuscateResult, Error> {
         transforms::unsafe_transforms::engine::set_eval_verbose(opts.verbose);
         let allocator = Allocator::default();
         let start = Instant::now();
@@ -295,8 +319,10 @@ impl Restringer {
         let source_type = if let Some(st) = opts.source_type {
             st
         } else if let Some(path) = opts.filename_for_source_type.as_ref() {
-            SourceType::from_path(path)
-                .map_err(|e| Error::InvalidSourceType { path: path.clone(), message: e.to_string() })?
+            SourceType::from_path(path).map_err(|e| Error::InvalidSourceType {
+                path: path.clone(),
+                message: e.to_string(),
+            })?
         } else {
             SourceType::mjs()
         };
@@ -330,7 +356,11 @@ impl Restringer {
                     check_timeout()?;
                     let mut modified_iter = false;
                     let mut changed_names = Vec::new();
-                    let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
+                    let mut ctx = TransformCtx {
+                        allocator: &allocator,
+                        source_text,
+                        source_type,
+                    };
                     for t in &self.safe_transforms {
                         check_timeout()?;
                         if t.run(&mut ctx, &mut program) {
@@ -363,7 +393,11 @@ impl Restringer {
                 check_timeout()?;
                 let mut modified_iter = false;
                 let mut changed_names = Vec::new();
-                let mut ctx = TransformCtx { allocator: &allocator, source_text, source_type };
+                let mut ctx = TransformCtx {
+                    allocator: &allocator,
+                    source_text,
+                    source_type,
+                };
                 for t in &self.unsafe_transforms {
                     check_timeout()?;
                     if t.run(&mut ctx, &mut program) {
@@ -404,6 +438,9 @@ impl Restringer {
             .with_source_text(source_text)
             .build(&program);
 
-        Ok(DeobfuscateResult { modified: modified_any, code })
+        Ok(DeobfuscateResult {
+            modified: modified_any,
+            code,
+        })
     }
 }

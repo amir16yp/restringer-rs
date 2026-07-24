@@ -16,7 +16,11 @@ impl Transform for RenameLocalIdentifiers {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = RenameVisitor { allocator: ctx.allocator, modified: false, stack: Vec::new() };
+        let mut v = RenameVisitor {
+            allocator: ctx.allocator,
+            modified: false,
+            stack: Vec::new(),
+        };
         v.visit_program(program);
         v.modified
     }
@@ -83,7 +87,10 @@ impl<'a> VisitMut<'a> for RenameVisitor<'a> {
     }
 }
 
-fn collect_renames_for_scope<'a>(stmts: &[Statement<'a>], _is_function_scope: bool) -> HashMap<String, String> {
+fn collect_renames_for_scope<'a>(
+    stmts: &[Statement<'a>],
+    _is_function_scope: bool,
+) -> HashMap<String, String> {
     let mut declared: HashSet<String> = HashSet::new();
     let mut candidates: Vec<(String, String)> = Vec::new();
 
@@ -97,7 +104,9 @@ fn collect_renames_for_scope<'a>(stmts: &[Statement<'a>], _is_function_scope: bo
     for stmt in stmts {
         if let Statement::VariableDeclaration(var_decl) = stmt {
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
                 let old_name = binding.name.as_str();
                 if !looks_obfuscated(old_name) {
                     continue;
@@ -107,7 +116,11 @@ fn collect_renames_for_scope<'a>(stmts: &[Statement<'a>], _is_function_scope: bo
                         candidates.push((old_name.to_string(), suggested));
                     }
                 }
-                if let Some(suggested) = push_pairs.iter().find(|(old, _)| old == old_name).map(|(_, name)| name.clone()) {
+                if let Some(suggested) = push_pairs
+                    .iter()
+                    .find(|(old, _)| old == old_name)
+                    .map(|(_, name)| name.clone())
+                {
                     candidates.push((old_name.to_string(), suggested));
                 }
             }
@@ -145,7 +158,9 @@ fn make_unique(base: &str, used: &HashSet<String>) -> String {
 
 fn is_valid_identifier(s: &str) -> bool {
     let mut chars = s.chars();
-    let Some(first) = chars.next() else { return false };
+    let Some(first) = chars.next() else {
+        return false;
+    };
     if !first.is_ascii_alphabetic() && first != '_' && first != '$' {
         return false;
     }
@@ -156,7 +171,12 @@ fn looks_obfuscated(name: &str) -> bool {
     if name.starts_with("_0x") {
         return true;
     }
-    if name.chars().any(|c| c.is_ascii_digit()) && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) && name.len() > 1 {
+    if name.chars().any(|c| c.is_ascii_digit())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && name.len() > 1
+    {
         return true;
     }
     false
@@ -192,10 +212,18 @@ fn collect_declared_names<'a>(stmt: &Statement<'a>, out: &mut HashSet<String>) {
 
 fn collect_push_pairs<'a>(stmts: &[Statement<'a>], out: &mut Vec<(String, String)>) {
     for window in stmts.windows(2) {
-        let Statement::ExpressionStatement(a) = &window[0] else { continue };
-        let Statement::ExpressionStatement(b) = &window[1] else { continue };
-        let Some((key_arr, key_lit)) = extract_push_literal(&a.expression) else { continue };
-        let Some((val_arr, val_id)) = extract_push_identifier(&b.expression) else { continue };
+        let Statement::ExpressionStatement(a) = &window[0] else {
+            continue;
+        };
+        let Statement::ExpressionStatement(b) = &window[1] else {
+            continue;
+        };
+        let Some((key_arr, key_lit)) = extract_push_literal(&a.expression) else {
+            continue;
+        };
+        let Some((val_arr, val_id)) = extract_push_identifier(&b.expression) else {
+            continue;
+        };
         if key_arr == val_arr {
             continue;
         }
@@ -205,7 +233,9 @@ fn collect_push_pairs<'a>(stmts: &[Statement<'a>], out: &mut Vec<(String, String
 }
 
 fn extract_push_literal<'a>(expr: &Expression<'a>) -> Option<(String, String)> {
-    let Expression::CallExpression(call) = expr else { return None };
+    let Expression::CallExpression(call) = expr else {
+        return None;
+    };
     let callee = unwrap_parens(&call.callee);
     let (object, method) = match callee {
         Expression::StaticMemberExpression(m) => (&m.object, m.property.name.as_str()),
@@ -221,14 +251,20 @@ fn extract_push_literal<'a>(expr: &Expression<'a>) -> Option<(String, String)> {
     if method != "push" {
         return None;
     }
-    let Expression::Identifier(arr) = unwrap_parens(object) else { return None };
+    let Expression::Identifier(arr) = unwrap_parens(object) else {
+        return None;
+    };
     let arg = call.arguments.first()?.as_expression()?;
-    let Expression::StringLiteral(s) = unwrap_parens(arg) else { return None };
+    let Expression::StringLiteral(s) = unwrap_parens(arg) else {
+        return None;
+    };
     Some((arr.name.as_str().to_string(), s.value.as_str().to_string()))
 }
 
 fn extract_push_identifier<'a>(expr: &Expression<'a>) -> Option<(String, String)> {
-    let Expression::CallExpression(call) = expr else { return None };
+    let Expression::CallExpression(call) = expr else {
+        return None;
+    };
     let callee = unwrap_parens(&call.callee);
     let (object, method) = match callee {
         Expression::StaticMemberExpression(m) => (&m.object, m.property.name.as_str()),
@@ -244,19 +280,23 @@ fn extract_push_identifier<'a>(expr: &Expression<'a>) -> Option<(String, String)
     if method != "push" {
         return None;
     }
-    let Expression::Identifier(arr) = unwrap_parens(object) else { return None };
+    let Expression::Identifier(arr) = unwrap_parens(object) else {
+        return None;
+    };
     let arg = call.arguments.first()?.as_expression()?;
-    let Expression::Identifier(id) = unwrap_parens(arg) else { return None };
+    let Expression::Identifier(id) = unwrap_parens(arg) else {
+        return None;
+    };
     Some((arr.name.as_str().to_string(), id.name.as_str().to_string()))
 }
 
 fn infer_name_from_expression<'a>(expr: &Expression<'a>) -> Option<String> {
     match expr {
-        Expression::StaticMemberExpression(m) => {
-            Some(camelize(m.property.name.as_str()))
-        }
+        Expression::StaticMemberExpression(m) => Some(camelize(m.property.name.as_str())),
         Expression::ComputedMemberExpression(m) => {
-            let Expression::StringLiteral(s) = unwrap_parens(&m.expression) else { return None };
+            let Expression::StringLiteral(s) = unwrap_parens(&m.expression) else {
+                return None;
+            };
             Some(camelize(s.value.as_str()))
         }
         Expression::CallExpression(call) => infer_name_from_call(call),
@@ -278,11 +318,15 @@ fn infer_name_from_call<'a>(call: &CallExpression<'a>) -> Option<String> {
 
     match method {
         "getElementById" | "getElementsByName" => {
-            let Expression::StringLiteral(s) = unwrap_parens(first_arg) else { return None };
+            let Expression::StringLiteral(s) = unwrap_parens(first_arg) else {
+                return None;
+            };
             Some(camelize(s.value.as_str()))
         }
         "querySelector" | "querySelectorAll" => {
-            let Expression::StringLiteral(s) = unwrap_parens(first_arg) else { return None };
+            let Expression::StringLiteral(s) = unwrap_parens(first_arg) else {
+                return None;
+            };
             if let Some(name) = extract_name_from_selector(s.value.as_str()) {
                 Some(name)
             } else {
@@ -290,7 +334,9 @@ fn infer_name_from_call<'a>(call: &CallExpression<'a>) -> Option<String> {
             }
         }
         "getElementsByTagName" | "getElementsByClassName" => {
-            let Expression::StringLiteral(s) = unwrap_parens(first_arg) else { return None };
+            let Expression::StringLiteral(s) = unwrap_parens(first_arg) else {
+                return None;
+            };
             Some(camelize(s.value.as_str()))
         }
         _ => None,
@@ -355,7 +401,12 @@ fn camelize_opt(s: &str) -> Option<String> {
             }
         }
     }
-    if result.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+    if result
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_digit())
+        .unwrap_or(false)
+    {
         result.insert(0, '_');
     }
     Some(result)

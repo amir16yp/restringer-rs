@@ -14,7 +14,10 @@ impl Transform for SimplifyIfStatements {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -72,7 +75,10 @@ impl<'a> Visitor<'a> {
                 new_if.test = self.invert_test(if_stmt.span, &if_stmt.test);
                 new_if.consequent = new_if.alternate.take().unwrap();
                 new_if.alternate = None;
-                out.push(Statement::IfStatement(ArenaBox::new_in(new_if, self.allocator)));
+                out.push(Statement::IfStatement(ArenaBox::new_in(
+                    new_if,
+                    self.allocator,
+                )));
                 self.modified = true;
                 return;
             }
@@ -82,7 +88,10 @@ impl<'a> Visitor<'a> {
                     // if (test) X else ;  => if (test) X
                     let mut new_if = (**if_stmt).clone_in(self.allocator);
                     new_if.alternate = None;
-                    out.push(Statement::IfStatement(ArenaBox::new_in(new_if, self.allocator)));
+                    out.push(Statement::IfStatement(ArenaBox::new_in(
+                        new_if,
+                        self.allocator,
+                    )));
                     self.modified = true;
                     return;
                 }

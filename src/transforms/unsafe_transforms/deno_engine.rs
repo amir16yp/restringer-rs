@@ -47,7 +47,9 @@ impl DenoEngine {
         if is_eval_verbose() {
             eprintln!("[verbose] deno result: {}", output);
         }
-        output.parse::<f64>().map_err(|e| format!("Failed to parse Deno number output {:?}: {}", output, e))
+        output
+            .parse::<f64>()
+            .map_err(|e| format!("Failed to parse Deno number output {:?}: {}", output, e))
     }
 
     pub fn eval_to_bool(&self, code: &str) -> Result<bool, String> {
@@ -62,7 +64,9 @@ impl DenoEngine {
         if is_eval_verbose() {
             eprintln!("[verbose] deno result: {}", output);
         }
-        output.parse::<bool>().map_err(|e| format!("Failed to parse Deno boolean output {:?}: {}", output, e))
+        output
+            .parse::<bool>()
+            .map_err(|e| format!("Failed to parse Deno boolean output {:?}: {}", output, e))
     }
 
     pub fn eval_to_json(&self, code: &str) -> Result<String, String> {
@@ -107,5 +111,7 @@ fn escape_js_string(s: &str) -> String {
 }
 
 fn trim_newline(s: &str) -> &str {
-    s.strip_suffix("\r\n").or_else(|| s.strip_suffix("\n")).unwrap_or(s)
+    s.strip_suffix("\r\n")
+        .or_else(|| s.strip_suffix("\n"))
+        .unwrap_or(s)
 }

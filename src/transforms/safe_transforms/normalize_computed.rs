@@ -14,7 +14,10 @@ impl Transform for NormalizeComputed {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -27,7 +30,9 @@ struct Visitor<'a> {
 
 fn is_valid_identifier(name: &str) -> bool {
     let mut chars = name.chars();
-    let Some(first) = chars.next() else { return false; };
+    let Some(first) = chars.next() else {
+        return false;
+    };
     if !(first.is_ascii_alphabetic() || first == '_' || first == '$') {
         return false;
     }
@@ -42,7 +47,11 @@ fn is_valid_identifier(name: &str) -> bool {
 impl<'a> Visitor<'a> {
     fn make_identifier_name(&self, span: oxc_span::Span, name: &str) -> IdentifierName<'a> {
         let name = self.allocator.alloc_str(name);
-        IdentifierName { node_id: Cell::new(NodeId::DUMMY), span, name: name.into() }
+        IdentifierName {
+            node_id: Cell::new(NodeId::DUMMY),
+            span,
+            name: name.into(),
+        }
     }
 }
 

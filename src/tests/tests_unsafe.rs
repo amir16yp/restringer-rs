@@ -1,15 +1,20 @@
 use crate::transforms::unsafe_transforms::eval_constant_expressions::EvalConstantExpressions;
 use crate::transforms::unsafe_transforms::js_runtime::JsEvaluator;
+use crate::transforms::unsafe_transforms::resolve_packed_eval_calls::ResolvePackedEvalCalls;
 use crate::{DeobfuscateOptions, Restringer};
 
 fn apply_module_to_code(code: &str, transform: Box<dyn crate::Transform>) -> String {
     let restringer = Restringer::default();
-    restringer.apply_module_to_code(code, transform, DeobfuscateOptions::default()).unwrap()
+    restringer
+        .apply_module_to_code(code, transform, DeobfuscateOptions::default())
+        .unwrap()
 }
 
 fn apply_module_to_code_looped(code: &str, transform: Box<dyn crate::Transform>) -> String {
     let restringer = Restringer::default();
-    restringer.apply_modules_to_code(code, vec![transform], DeobfuscateOptions::default()).unwrap()
+    restringer
+        .apply_modules_to_code(code, vec![transform], DeobfuscateOptions::default())
+        .unwrap()
 }
 
 fn assert_transform(transform_name: &str, input: &str, expected: &str, actual: &str) {
@@ -18,6 +23,27 @@ fn assert_transform(transform_name: &str, input: &str, expected: &str, actual: &
     println!("### Expected\n```javascript\n{}\n```\n", expected);
     println!("### Actual\n```javascript\n{}\n```\n", actual);
     assert_eq!(actual, expected);
+}
+
+#[cfg(test)]
+mod resolve_packed_eval_calls {
+    use super::*;
+
+    #[test]
+    fn resolves_packer_using_preceding_helper() {
+        let code = "function decode(value) { return value; } eval(function(payload) { return decode(payload); }(\"const answer = 42;\"));";
+        let expected = "function decode(value) {\n\treturn value;\n}\nconst answer = 42;\n";
+        let result = apply_module_to_code(code, Box::new(ResolvePackedEvalCalls::new()));
+        assert_transform("ResolvePackedEvalCalls", code, expected, &result);
+    }
+
+    #[test]
+    fn resolves_nested_self_contained_packer() {
+        let code = "if (true) eval(function(payload) { return payload; }(\"const answer = 42;\"));";
+        let expected = "if (true) eval(\"const answer = 42;\");\n";
+        let result = apply_module_to_code(code, Box::new(ResolvePackedEvalCalls::new()));
+        assert_transform("ResolvePackedEvalCalls", code, expected, &result);
+    }
 }
 
 #[cfg(test)]
@@ -62,7 +88,9 @@ mod js_evaluator {
     #[test]
     fn test_eval_complex_expression() {
         let evaluator = JsEvaluator::new();
-        let result = evaluator.eval_to_number("Math.pow(2, 3) + Math.sqrt(16)").unwrap();
+        let result = evaluator
+            .eval_to_number("Math.pow(2, 3) + Math.sqrt(16)")
+            .unwrap();
         assert_eq!(result, 12.0);
     }
 
@@ -226,8 +254,16 @@ mod resolve_augmented_function_wrapped_array_replacements {
             })(arr, 1);
         "#;
         let expected = "var arr = [\n\t\"second\",\n\t\"third\",\n\t\"first\"\n];\n";
-        let result = apply_module_to_code(code, Box::new(ResolveAugmentedFunctionWrappedArrayReplacements::new()));
-        assert_transform("ResolveAugmentedFunctionWrappedArrayReplacements", code, expected, &result);
+        let result = apply_module_to_code(
+            code,
+            Box::new(ResolveAugmentedFunctionWrappedArrayReplacements::new()),
+        );
+        assert_transform(
+            "ResolveAugmentedFunctionWrappedArrayReplacements",
+            code,
+            expected,
+            &result,
+        );
     }
 }
 
@@ -243,7 +279,8 @@ mod resolve_builtin_calls {
             const b = "foo,bar".split(",");
             const c = [1, 2, 3].join("-");
         "#;
-        let expected = "const a = \"Hello\";\nconst b = [\"foo\", \"bar\"];\nconst c = \"1-2-3\";\n";
+        let expected =
+            "const a = \"Hello\";\nconst b = [\"foo\", \"bar\"];\nconst c = \"1-2-3\";\n";
         let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
         assert_transform("ResolveBuiltinCalls", code, expected, &result);
     }
@@ -257,7 +294,9 @@ mod ant_regression {
     fn test_ant_js_does_not_lose_function_body() {
         let code = include_str!("../../restringer-js/tests/resources/ant.js");
         let restringer = Restringer::default();
-        let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
+        let result = restringer
+            .deobfuscate(code, DeobfuscateOptions::default())
+            .unwrap();
         assert!(result.modified);
         // The bug caused only the string-array declaration to be emitted.
         assert!(
@@ -274,7 +313,9 @@ mod ant_regression {
     fn test_udu_js_resolves_string_array() {
         let code = include_str!("../../restringer-js/tests/resources/udu.js");
         let restringer = Restringer::default();
-        let result = restringer.deobfuscate(code, DeobfuscateOptions::default()).unwrap();
+        let result = restringer
+            .deobfuscate(code, DeobfuscateOptions::default())
+            .unwrap();
         assert!(result.modified);
         assert!(
             !result.code.contains("_$_2b1a["),

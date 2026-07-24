@@ -14,7 +14,10 @@ impl Transform for SimplifyCalls {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -73,8 +76,12 @@ impl<'a> Visitor<'a> {
     }
 
     fn allowed_context_arg(&self, call: &CallExpression<'a>) -> bool {
-        let Some(first) = call.arguments.first() else { return false; };
-        let Some(expr) = first.as_expression() else { return false; };
+        let Some(first) = call.arguments.first() else {
+            return false;
+        };
+        let Some(expr) = first.as_expression() else {
+            return false;
+        };
         match self.unwrap_parens(expr) {
             Expression::ThisExpression(_) => true,
             Expression::NullLiteral(_) => true,
@@ -90,7 +97,11 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn simplified_args(&self, call: &CallExpression<'a>, method: &str) -> ArenaVec<'a, Argument<'a>> {
+    fn simplified_args(
+        &self,
+        call: &CallExpression<'a>,
+        method: &str,
+    ) -> ArenaVec<'a, Argument<'a>> {
         let mut args = ArenaVec::new_in(self.allocator);
         if method == "call" {
             for a in call.arguments.iter().skip(1) {
@@ -125,7 +136,12 @@ impl<'a> Visitor<'a> {
         args
     }
 
-    fn make_call_expr(&self, span: oxc_span::Span, callee: Expression<'a>, arguments: ArenaVec<'a, Argument<'a>>) -> Expression<'a> {
+    fn make_call_expr(
+        &self,
+        span: oxc_span::Span,
+        callee: Expression<'a>,
+        arguments: ArenaVec<'a, Argument<'a>>,
+    ) -> Expression<'a> {
         Expression::CallExpression(ArenaBox::new_in(
             CallExpression {
                 node_id: Cell::new(NodeId::DUMMY),

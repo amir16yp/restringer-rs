@@ -63,9 +63,13 @@ impl<'a> Visitor<'a> {
         let mut used_in_conditional: HashSet<String> = HashSet::new();
 
         for stmt in stmts {
-            let Statement::VariableDeclaration(var_decl) = stmt else { continue; };
+            let Statement::VariableDeclaration(var_decl) = stmt else {
+                continue;
+            };
             for decl in &var_decl.declarations {
-                let BindingPattern::BindingIdentifier(binding) = &decl.id else { continue; };
+                let BindingPattern::BindingIdentifier(binding) = &decl.id else {
+                    continue;
+                };
                 if decl.init.is_none() {
                     declared_uninit.insert(binding.name.as_str().to_string());
                 }
@@ -110,11 +114,15 @@ impl<'a> Visitor<'a> {
                 continue;
             }
 
-            let Some(count) = assignment_count.get(&name) else { continue; };
+            let Some(count) = assignment_count.get(&name) else {
+                continue;
+            };
             if *count != 1 {
                 continue;
             }
-            let Some(lit) = assignment_literal.get(&name) else { continue; };
+            let Some(lit) = assignment_literal.get(&name) else {
+                continue;
+            };
             out.insert(name, lit.clone_in(self.allocator));
         }
 
@@ -349,12 +357,13 @@ impl<'a> Visitor<'a> {
         disqualified: &mut HashSet<String>,
     ) {
         match stmt {
-            Statement::ExpressionStatement(es) => self.collect_writes_and_single_literal_assignment_expr(
-                &es.expression,
-                assignment_count,
-                assignment_literal,
-                disqualified,
-            ),
+            Statement::ExpressionStatement(es) => self
+                .collect_writes_and_single_literal_assignment_expr(
+                    &es.expression,
+                    assignment_count,
+                    assignment_literal,
+                    disqualified,
+                ),
             Statement::ReturnStatement(rs) => {
                 if let Some(arg) = rs.argument.as_ref() {
                     self.collect_writes_and_single_literal_assignment_expr(
@@ -619,14 +628,13 @@ impl<'a> Visitor<'a> {
                     disqualified,
                 );
             }
-            Expression::ParenthesizedExpression(p) => {
-                self.collect_writes_and_single_literal_assignment_expr(
+            Expression::ParenthesizedExpression(p) => self
+                .collect_writes_and_single_literal_assignment_expr(
                     &p.expression,
                     assignment_count,
                     assignment_literal,
                     disqualified,
-                )
-            }
+                ),
             Expression::ComputedMemberExpression(c) => {
                 self.collect_writes_and_single_literal_assignment_expr(
                     &c.object,

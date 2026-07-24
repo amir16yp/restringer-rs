@@ -16,7 +16,10 @@ impl Transform for SimplifyArrayCoercion {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut visitor = Visitor { allocator: ctx.allocator, modified: false };
+        let mut visitor = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         visitor.visit_program(program);
         visitor.modified
     }

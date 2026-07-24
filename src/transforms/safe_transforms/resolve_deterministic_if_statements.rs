@@ -12,7 +12,10 @@ impl Transform for ResolveDeterministicIfStatements {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -108,7 +111,10 @@ impl<'a> Visitor<'a> {
                 let replacement = if test_truthy {
                     Some(if_stmt.consequent.clone_in(self.allocator))
                 } else {
-                    if_stmt.alternate.as_ref().map(|a| a.clone_in(self.allocator))
+                    if_stmt
+                        .alternate
+                        .as_ref()
+                        .map(|a| a.clone_in(self.allocator))
                 };
 
                 if let Some(rep) = replacement {

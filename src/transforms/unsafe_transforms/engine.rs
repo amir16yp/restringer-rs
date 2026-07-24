@@ -1,5 +1,10 @@
-#[cfg(not(any(feature = "unsafe-transform-quickjs", feature = "unsafe-transform-deno")))]
-compile_error!("One of the features `unsafe-transform-quickjs` or `unsafe-transform-deno` must be enabled");
+#[cfg(not(any(
+    feature = "unsafe-transform-quickjs",
+    feature = "unsafe-transform-deno"
+)))]
+compile_error!(
+    "One of the features `unsafe-transform-quickjs` or `unsafe-transform-deno` must be enabled"
+);
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
@@ -14,9 +19,16 @@ pub enum Engine {
 impl Default for Engine {
     fn default() -> Self {
         #[cfg(feature = "unsafe-transform-deno")]
-        { Self::Deno }
-        #[cfg(all(feature = "unsafe-transform-quickjs", not(feature = "unsafe-transform-deno")))]
-        { Self::QuickJs }
+        {
+            Self::Deno
+        }
+        #[cfg(all(
+            feature = "unsafe-transform-quickjs",
+            not(feature = "unsafe-transform-deno")
+        ))]
+        {
+            Self::QuickJs
+        }
     }
 }
 
@@ -49,15 +61,23 @@ impl Engine {
         match value {
             ENGINE_QUICKJS => {
                 #[cfg(feature = "unsafe-transform-quickjs")]
-                { Self::QuickJs }
+                {
+                    Self::QuickJs
+                }
                 #[cfg(not(feature = "unsafe-transform-quickjs"))]
-                { Self::default() }
+                {
+                    Self::default()
+                }
             }
             ENGINE_DENO => {
                 #[cfg(feature = "unsafe-transform-deno")]
-                { Self::Deno }
+                {
+                    Self::Deno
+                }
                 #[cfg(not(feature = "unsafe-transform-deno"))]
-                { Self::default() }
+                {
+                    Self::default()
+                }
             }
             _ => Self::default(),
         }

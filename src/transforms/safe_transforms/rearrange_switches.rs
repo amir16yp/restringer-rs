@@ -12,7 +12,10 @@ impl Transform for RearrangeSwitches {
     }
 
     fn run<'a>(&self, ctx: &mut TransformCtx<'a>, program: &mut Program<'a>) -> bool {
-        let mut v = Visitor { allocator: ctx.allocator, modified: false };
+        let mut v = Visitor {
+            allocator: ctx.allocator,
+            modified: false,
+        };
         v.visit_program(program);
         v.modified
     }
@@ -35,7 +38,10 @@ fn extract_lit(expr: &Expression<'_>) -> Option<LitVal> {
         Expression::BooleanLiteral(l) => Some(LitVal::Bool(l.value)),
         Expression::NumericLiteral(l) => Some(LitVal::Number(l.value)),
         Expression::StringLiteral(l) => Some(LitVal::String(l.value.as_str().to_string())),
-        Expression::BigIntLiteral(l) => l.raw.as_ref().map(|r| LitVal::BigInt(r.as_str().to_string())),
+        Expression::BigIntLiteral(l) => l
+            .raw
+            .as_ref()
+            .map(|r| LitVal::BigInt(r.as_str().to_string())),
         _ => None,
     }
 }
@@ -47,7 +53,9 @@ struct Visitor<'a> {
 
 impl<'a> Visitor<'a> {
     fn extract_state_var_init(&self, stmt: &Statement<'a>) -> Option<(&'a str, LitVal)> {
-        let Statement::VariableDeclaration(var_decl) = stmt else { return None; };
+        let Statement::VariableDeclaration(var_decl) = stmt else {
+            return None;
+        };
         if var_decl.declarations.len() != 1 {
             return None;
         }
@@ -62,7 +70,9 @@ impl<'a> Visitor<'a> {
     }
 
     fn switch_discriminant_ident<'b>(&self, stmt: &'b Statement<'a>) -> Option<&'b str> {
-        let Statement::SwitchStatement(sw) = stmt else { return None; };
+        let Statement::SwitchStatement(sw) = stmt else {
+            return None;
+        };
         match &sw.discriminant {
             Expression::Identifier(ident) => Some(ident.name.as_str()),
             _ => None,
@@ -81,8 +91,12 @@ impl<'a> Visitor<'a> {
     }
 
     fn direct_assignment_to(&self, stmt: &Statement<'a>, name: &str) -> Option<LitVal> {
-        let Statement::ExpressionStatement(expr_stmt) = stmt else { return None; };
-        let Expression::AssignmentExpression(assign) = &expr_stmt.expression else { return None; };
+        let Statement::ExpressionStatement(expr_stmt) = stmt else {
+            return None;
+        };
+        let Expression::AssignmentExpression(assign) = &expr_stmt.expression else {
+            return None;
+        };
 
         let target = assign.left.as_simple_assignment_target()?;
         let left_name = match target {
@@ -97,7 +111,12 @@ impl<'a> Visitor<'a> {
         extract_lit(&assign.right)
     }
 
-    fn linearize_switch(&self, sw: &SwitchStatement<'a>, state_name: &str, init: LitVal) -> Option<ArenaVec<'a, Statement<'a>>> {
+    fn linearize_switch(
+        &self,
+        sw: &SwitchStatement<'a>,
+        state_name: &str,
+        init: LitVal,
+    ) -> Option<ArenaVec<'a, Statement<'a>>> {
         let mut ordered = ArenaVec::new_in(self.allocator);
         let mut current = Some(init);
         let mut counter = 0usize;
@@ -114,7 +133,9 @@ impl<'a> Visitor<'a> {
                     break;
                 }
             }
-            let Some(case) = current_case else { break; };
+            let Some(case) = current_case else {
+                break;
+            };
 
             for stmt in &case.consequent {
                 if !self.is_break_statement(stmt) {
@@ -138,7 +159,11 @@ impl<'a> Visitor<'a> {
             counter += 1;
         }
 
-        if ordered.is_empty() { None } else { Some(ordered) }
+        if ordered.is_empty() {
+            None
+        } else {
+            Some(ordered)
+        }
     }
 
     fn transform_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>) {
@@ -152,7 +177,9 @@ impl<'a> Visitor<'a> {
                     if let Some(sw_ident) = self.switch_discriminant_ident(next) {
                         if sw_ident == state_name {
                             if let Statement::SwitchStatement(sw) = next {
-                                if let Some(ordered) = self.linearize_switch(sw, state_name, init_val) {
+                                if let Some(ordered) =
+                                    self.linearize_switch(sw, state_name, init_val)
+                                {
                                     for s in ordered {
                                         out.push(s);
                                     }
