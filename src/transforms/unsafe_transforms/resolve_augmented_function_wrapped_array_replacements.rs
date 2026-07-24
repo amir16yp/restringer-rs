@@ -1,6 +1,7 @@
 use oxc_allocator::{CloneIn, Vec as ArenaVec};
 use oxc_ast::ast::*;
 use oxc_ast_visit::VisitMut;
+use oxc_span::SourceType;
 
 use super::helpers;
 use super::js_runtime::JsEvaluator;
@@ -110,6 +111,10 @@ impl Transform for ResolveAugmentedFunctionWrappedArrayReplacements {
             "{};\n{};\n(typeof {} === 'function' ? {}() : {});",
             decl_code, iife_code, name, name, name
         );
+
+        if helpers::has_unresolved_references(&retrieve_code, SourceType::mjs()) {
+            return false;
+        }
 
         let Ok(json_res) = self.evaluator.eval_to_json(&retrieve_code) else {
             return false;

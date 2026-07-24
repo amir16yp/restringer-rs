@@ -127,6 +127,9 @@ impl<'a, 'b> VisitMut<'a> for NestedPackedEvalVisitor<'a, 'b> {
 
         let code = helpers::expression_to_code(argument);
         let context = format!("{};{}", helpers::EVAL_PRELUDE, code);
+        if helpers::has_unresolved_references(&context, SourceType::mjs()) {
+            return;
+        }
         let Ok(result) = self.transform.evaluator().eval_to_json(&context) else {
             return;
         };

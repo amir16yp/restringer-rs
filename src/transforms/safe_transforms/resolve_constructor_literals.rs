@@ -39,7 +39,8 @@ impl<'a> VisitMut<'a> for Visitor<'a> {
 
         match callee.name.as_str() {
             "RegExp" => {
-                if let Some(lit_expr) = regexp_literal_from_new(&new_expr.arguments, self.allocator) {
+                if let Some(lit_expr) = regexp_literal_from_new(&new_expr.arguments, self.allocator)
+                {
                     *it = lit_expr;
                     self.modified = true;
                 }

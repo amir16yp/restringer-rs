@@ -990,7 +990,11 @@ mod rename_local_identifiers {
             "expected _0xabc to be renamed; got: {}",
             result
         );
-        assert!(result.contains("function func"), "expected readable function name; got: {}", result);
+        assert!(
+            result.contains("function func"),
+            "expected readable function name; got: {}",
+            result
+        );
     }
 
     #[test]
@@ -1002,7 +1006,11 @@ mod rename_local_identifiers {
             "expected _0xcls to be renamed; got: {}",
             result
         );
-        assert!(result.contains("class cls"), "expected readable class name; got: {}", result);
+        assert!(
+            result.contains("class cls"),
+            "expected readable class name; got: {}",
+            result
+        );
     }
 }
 
@@ -1020,21 +1028,33 @@ mod remove_dead_declarations {
             "expected dead function to be removed; got: {}",
             result
         );
-        assert!(result.contains("console.log(2)"), "expected console.log to remain; got: {}", result);
+        assert!(
+            result.contains("console.log(2)"),
+            "expected console.log to remain; got: {}",
+            result
+        );
     }
 
     #[test]
     fn keeps_used_function_declaration() {
         let code = r#"function _0xabc() { return 1; } console.log(_0xabc());"#;
         let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
-        assert!(result.contains("function _0xabc"), "expected used function to remain; got: {}", result);
+        assert!(
+            result.contains("function _0xabc"),
+            "expected used function to remain; got: {}",
+            result
+        );
     }
 
     #[test]
     fn keeps_function_used_in_return_statement() {
         let code = r#"function f() { function helper() { return 1; } return helper(); } f();"#;
         let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
-        assert!(result.contains("function helper"), "expected helper used in return to remain; got: {}", result);
+        assert!(
+            result.contains("function helper"),
+            "expected helper used in return to remain; got: {}",
+            result
+        );
     }
 
     #[test]
@@ -1042,14 +1062,22 @@ mod remove_dead_declarations {
         use crate::transforms::safe_transforms::resolve_constructor_literals::ResolveConstructorLiterals;
         let code = r#"const re = new RegExp("abc", "g");"#;
         let result = apply_module_to_code(code, Box::new(ResolveConstructorLiterals));
-        assert!(result.contains("const re = /abc/g"), "expected regex literal; got: {}", result);
+        assert!(
+            result.contains("const re = /abc/g"),
+            "expected regex literal; got: {}",
+            result
+        );
     }
 
     #[test]
     fn keeps_root_level_function_declaration() {
         let code = r#"function _0xabc() { return 1; }"#;
         let result = apply_module_to_code(code, Box::new(RemoveDeadDeclarations));
-        assert!(result.contains("function _0xabc"), "expected root-level function to remain; got: {}", result);
+        assert!(
+            result.contains("function _0xabc"),
+            "expected root-level function to remain; got: {}",
+            result
+        );
     }
 
     #[test]

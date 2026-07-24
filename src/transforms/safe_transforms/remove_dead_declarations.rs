@@ -47,19 +47,12 @@ struct Visitor<'a> {
 }
 
 impl<'a> Visitor<'a> {
-    fn simplify_statement_list(
-        &mut self,
-        stmts: &mut ArenaVec<'a, Statement<'a>>,
-        is_root: bool,
-    ) {
+    fn simplify_statement_list(&mut self, stmts: &mut ArenaVec<'a, Statement<'a>>, is_root: bool) {
         let original = std::mem::replace(stmts, ArenaVec::new_in(self.allocator));
         let has_eval = original.iter().any(|stmt| has_eval_call(stmt));
         let mut new_body = ArenaVec::new_in(self.allocator);
         for stmt in original {
-            if !is_root
-                && !has_eval
-                && is_dead_declaration(&stmt, &self.reads)
-            {
+            if !is_root && !has_eval && is_dead_declaration(&stmt, &self.reads) {
                 self.modified = true;
                 continue;
             }

@@ -20,10 +20,15 @@ fn log_eval_result(op: &str, input: &str, output: &Result<String, String>) {
         }
         Err(err) => {
             let err_summary = err.lines().next().unwrap_or(err).to_string();
-            eprintln!(
-                "[verbose] deno {} failed: input {} chars: {}",
-                op, input_len, err_summary
-            );
+            // Expected runtime failures (ReferenceError, TypeError, etc.) are
+            // surfaced to the caller as Err; don't spam verbose logs with them.
+            // Only log genuine infrastructure/unexpected errors.
+            if !err_summary.starts_with("Deno eval failed:") {
+                eprintln!(
+                    "[verbose] deno {} failed: input {} chars: {}",
+                    op, input_len, err_summary
+                );
+            }
         }
     }
 }

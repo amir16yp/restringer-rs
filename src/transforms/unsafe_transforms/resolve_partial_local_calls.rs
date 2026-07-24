@@ -75,9 +75,7 @@ fn extract_candidate(func: &Function<'_>) -> Option<Candidate> {
     };
     let arg = ret.argument.as_ref()?;
 
-    let mut free = FreeIdentifierCollector {
-        names: Vec::new(),
-    };
+    let mut free = FreeIdentifierCollector { names: Vec::new() };
     free.visit_expression(arg);
 
     let params: Vec<String> = func
@@ -100,7 +98,7 @@ fn extract_candidate(func: &Function<'_>) -> Option<Candidate> {
         }
         // Allow common safe globals. Anything else is treated as a closure capture
         // and we skip inlining to preserve semantics.
-        if !is_known_global(name.as_str()) {
+        if !helpers::is_known_global(name.as_str()) {
             return None;
         }
     }
@@ -109,16 +107,6 @@ fn extract_candidate(func: &Function<'_>) -> Option<Candidate> {
         params,
         body_expr_code: helpers::expression_to_code(arg),
     })
-}
-
-fn is_known_global(name: &str) -> bool {
-    const GLOBALS: &[&str] = &[
-        "Array", "Boolean", "Date", "Error", "Function", "JSON", "Math", "Number", "Object",
-        "RegExp", "String", "Symbol", "parseInt", "parseFloat", "isNaN", "isFinite", "atob",
-        "btoa", "escape", "unescape", "encodeURI", "encodeURIComponent", "decodeURI",
-        "decodeURIComponent", "undefined", "NaN", "Infinity",
-    ];
-    GLOBALS.contains(&name)
 }
 
 struct InlineVisitor<'a> {
@@ -154,7 +142,8 @@ impl<'a> VisitMut<'a> for InlineVisitor<'a> {
             }
         }
 
-        let parsed = helpers::parse_expression_in(self.allocator, &candidate.body_expr_code, call.span);
+        let parsed =
+            helpers::parse_expression_in(self.allocator, &candidate.body_expr_code, call.span);
         let Some(mut body_expr) = parsed else {
             return;
         };

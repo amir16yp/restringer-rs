@@ -61,10 +61,10 @@ impl ResolveBuiltinCalls {
     }
 
     fn is_builtin_call(&self, call: &CallExpression) -> bool {
-        let args_ok = call
-            .arguments
-            .iter()
-            .all(|arg| arg.as_expression().map_or(false, |e| self.is_safe_argument(e)));
+        let args_ok = call.arguments.iter().all(|arg| {
+            arg.as_expression()
+                .map_or(false, |e| self.is_safe_argument(e))
+        });
 
         if !args_ok {
             return false;
@@ -146,7 +146,11 @@ impl ResolveBuiltinCalls {
                     ),
                     Expression::Identifier(id) if id.name.as_str() == "Object" => matches!(
                         prop_name,
-                        "keys" | "values" | "entries" | "getOwnPropertyNames" | "getOwnPropertySymbols"
+                        "keys"
+                            | "values"
+                            | "entries"
+                            | "getOwnPropertyNames"
+                            | "getOwnPropertySymbols"
                     ),
                     Expression::Identifier(id) if id.name.as_str() == "Array" => {
                         matches!(prop_name, "isArray" | "from")

@@ -60,6 +60,17 @@ mod resolve_packed_eval_calls {
         let result = apply_module_to_code(code, Box::new(ResolvePackedEvalCalls::new()));
         assert_transform("ResolvePackedEvalCalls", code, expected, &result);
     }
+
+    #[test]
+    fn skips_packer_with_unresolved_reference() {
+        let code = r#"if (true) eval(function(payload) { return unknownFunc(payload); }("const answer = 42;"));"#;
+        let result = apply_module_to_code(code, Box::new(ResolvePackedEvalCalls::new()));
+        assert!(
+            result.contains("unknownFunc(payload)"),
+            "expected packer with unresolved reference to stay unevaluated; got: {}",
+            result
+        );
+    }
 }
 
 #[cfg(test)]
@@ -300,7 +311,11 @@ mod resolve_local_calls {
             })();
         "#;
         let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
-        assert!(result.contains("const a = 3"), "expected helper(2) to resolve to 3; got: {}", result);
+        assert!(
+            result.contains("const a = 3"),
+            "expected helper(2) to resolve to 3; got: {}",
+            result
+        );
     }
 
     #[test]
@@ -311,7 +326,11 @@ mod resolve_local_calls {
             const y = addConstant(z);
         "#;
         let result = apply_module_to_code(code, Box::new(ResolvePartialLocalCalls));
-        assert!(result.contains("const y = z + 2 * 3"), "expected partial inline; got: {}", result);
+        assert!(
+            result.contains("const y = z + 2 * 3"),
+            "expected partial inline; got: {}",
+            result
+        );
     }
 
     #[test]
@@ -321,7 +340,81 @@ mod resolve_local_calls {
             const a = helper(2);
         "#;
         let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
-        assert!(result.contains("const a = 3"), "expected helper(2) to resolve to 3; got: {}", result);
+        assert!(
+            result.contains("const a = 3"),
+            "expected helper(2) to resolve to 3; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn skips_local_call_referencing_enclosing_parameter() {
+        let code = r#"
+            function helper(x) { return x + 1; }
+            function outer(y) {
+                return helper(y);
+            }
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert!(
+            result.contains("helper(y)"),
+            "expected helper(y) to stay unresolved because y is not in eval context; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn skips_eval_when_context_has_conflicting_declarations() {
+        // Block-scoped function and a top-level const share a name. The transform
+        // hoists the nested function into the eval context, which would create a
+        // duplicate declaration syntax error. It should bail out safely.
+        let code = r#"
+            {
+                function helper() { return 1; }
+            }
+            const helper = 2;
+            helper();
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert!(
+            result.contains("const helper = 2"),
+            "expected transform to leave code unchanged when context is invalid; got: {}",
+            result
+        );
+        assert!(
+            result.contains("helper()"),
+            "expected helper() call to remain; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn skips_local_call_when_function_body_has_unresolved_free_reference() {
+        let code = r#"
+            function helper() { return unknownVar + 1; }
+            const a = helper();
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert!(
+            result.contains("const a = helper()"),
+            "expected helper() call to remain when body references unknownVar; got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn resolves_local_call_when_function_body_uses_available_reference() {
+        let code = r#"
+            var table = ["x", "y"];
+            function helper() { return table[0]; }
+            const a = helper();
+        "#;
+        let result = apply_module_to_code(code, Box::new(ResolveLocalCalls::new()));
+        assert!(
+            result.contains("const a = \"x\""),
+            "expected helper() to resolve when table is in context; got: {}",
+            result
+        );
     }
 
     #[test]
@@ -426,15 +519,51 @@ mod resolve_builtin_calls {
             const f = JSON.stringify({x: 1});
         "#;
         let result = apply_module_to_code(code, Box::new(ResolveBuiltinCalls::new()));
-        assert!(!result.contains("Math.max"), "expected Math.max to be resolved; got: {}", result);
-        assert!(!result.contains("Object.keys"), "expected Object.keys to be resolved; got: {}", result);
-        assert!(!result.contains("Array.isArray"), "expected Array.isArray to be resolved; got: {}", result);
-        assert!(!result.contains("Number("), "expected Number to be resolved; got: {}", result);
-        assert!(!result.contains("Boolean("), "expected Boolean to be resolved; got: {}", result);
-        assert!(!result.contains("JSON.stringify"), "expected JSON.stringify to be resolved; got: {}", result);
-        assert!(result.contains("const a = 2"), "expected a = 2; got: {}", result);
-        assert!(result.contains("const c = true"), "expected c = true; got: {}", result);
-        assert!(result.contains("const e = false"), "expected e = false; got: {}", result);
+        assert!(
+            !result.contains("Math.max"),
+            "expected Math.max to be resolved; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("Object.keys"),
+            "expected Object.keys to be resolved; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("Array.isArray"),
+            "expected Array.isArray to be resolved; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("Number("),
+            "expected Number to be resolved; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("Boolean("),
+            "expected Boolean to be resolved; got: {}",
+            result
+        );
+        assert!(
+            !result.contains("JSON.stringify"),
+            "expected JSON.stringify to be resolved; got: {}",
+            result
+        );
+        assert!(
+            result.contains("const a = 2"),
+            "expected a = 2; got: {}",
+            result
+        );
+        assert!(
+            result.contains("const c = true"),
+            "expected c = true; got: {}",
+            result
+        );
+        assert!(
+            result.contains("const e = false"),
+            "expected e = false; got: {}",
+            result
+        );
     }
 }
 

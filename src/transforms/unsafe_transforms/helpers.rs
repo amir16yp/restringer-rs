@@ -6,6 +6,7 @@ use oxc_ast::ast::*;
 use oxc_ast_visit::Visit;
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::Parser;
+use oxc_semantic::SemanticBuilder;
 use oxc_span::{GetSpanMut, SourceType, Span};
 use oxc_syntax::node::NodeId;
 
@@ -197,6 +198,15 @@ pub fn collect_referenced_idents(stmt: &Statement) -> HashSet<String> {
     collector.names
 }
 
+/// Collects the names of all identifier references inside an expression.
+pub fn collect_referenced_idents_expr(expr: &Expression) -> HashSet<String> {
+    let mut collector = IdentCollector {
+        names: HashSet::new(),
+    };
+    collector.visit_expression(expr);
+    collector.names
+}
+
 struct IdentCollector {
     names: HashSet<String>,
 }
@@ -205,6 +215,95 @@ impl<'a> Visit<'a> for IdentCollector {
     fn visit_identifier_reference(&mut self, it: &IdentifierReference<'a>) {
         self.names.insert(it.name.to_string());
     }
+}
+
+/// JavaScript built-in globals that are safe to reference during evaluation.
+pub const KNOWN_GLOBALS: &[&str] = &[
+    "Array",
+    "Boolean",
+    "Date",
+    "Error",
+    "Function",
+    "JSON",
+    "Map",
+    "Math",
+    "Number",
+    "Object",
+    "RegExp",
+    "Set",
+    "String",
+    "Symbol",
+    "WeakMap",
+    "WeakSet",
+    "parseInt",
+    "parseFloat",
+    "isNaN",
+    "isFinite",
+    "atob",
+    "btoa",
+    "escape",
+    "unescape",
+    "encodeURI",
+    "encodeURIComponent",
+    "decodeURI",
+    "decodeURIComponent",
+    "undefined",
+    "NaN",
+    "Infinity",
+    "console",
+];
+
+/// True if `name` is a known JavaScript built-in global.
+pub fn is_known_global(name: &str) -> bool {
+    KNOWN_GLOBALS.contains(&name)
+}
+
+/// True if the source snippet has any root-scope identifier references that are
+/// not resolved to a declaration in the snippet itself and are not known safe
+/// globals or skip identifiers. This is used to avoid spawning a JS engine for
+/// code that is guaranteed to fail with ReferenceError/TypeError at runtime.
+pub fn has_unresolved_references(source: &str, source_type: SourceType) -> bool {
+    let allocator = Allocator::default();
+    let parse_ret = Parser::new(&allocator, source, source_type).parse();
+    if !parse_ret.errors.is_empty() {
+        return true;
+    }
+    let semantic_ret = SemanticBuilder::new().build(&parse_ret.program);
+    if !semantic_ret.errors.is_empty() {
+        return true;
+    }
+    let unresolved = semantic_ret.semantic.scoping().root_unresolved_references();
+    for name in unresolved.keys() {
+        let name_str = name.as_str();
+        if !is_known_global(name_str) && !SKIP_IDENTIFIERS.contains(&name_str) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Computes the set of free identifier references for a single statement:
+/// identifiers used in the statement that are not declared inside it and are
+/// not known safe globals or skip identifiers.
+pub fn free_identifier_references(stmt: &Statement) -> HashSet<String> {
+    let allocator = Allocator::default();
+    let mut program = empty_program(&allocator);
+    program.body.push(stmt.clone_in(&allocator));
+
+    let semantic_ret = SemanticBuilder::new().build(&program);
+    if !semantic_ret.errors.is_empty() {
+        return HashSet::new();
+    }
+
+    let mut free = HashSet::new();
+    let unresolved = semantic_ret.semantic.scoping().root_unresolved_references();
+    for name in unresolved.keys() {
+        let name_str = name.as_str();
+        if !is_known_global(name_str) && !SKIP_IDENTIFIERS.contains(&name_str) {
+            free.insert(name_str.to_string());
+        }
+    }
+    free
 }
 
 /// A polyfill prepended to evaluation snippets to provide browser globals

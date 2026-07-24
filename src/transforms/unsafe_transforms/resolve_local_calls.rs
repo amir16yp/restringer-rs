@@ -1,7 +1,8 @@
 use oxc_ast::ast::*;
 use oxc_ast_visit::{Visit, VisitMut};
-use oxc_span::GetSpan;
-use std::collections::HashSet;
+use oxc_parser::Parser;
+use oxc_span::{GetSpan, SourceType};
+use std::collections::{HashMap, HashSet};
 
 use super::helpers;
 use super::js_runtime::JsEvaluator;
@@ -36,10 +37,12 @@ impl Transform for ResolveLocalCalls {
         let mut function_collector = FunctionCollector {
             context_parts: Vec::new(),
             names: HashSet::new(),
+            free_refs: HashMap::new(),
         };
         function_collector.visit_program(&*program);
         let mut context_parts = function_collector.context_parts;
         let mut local_function_names = function_collector.names;
+        let mut function_free_refs = function_collector.free_refs;
 
         for stmt in &program.body {
             let code = helpers::statement_to_code(stmt);
@@ -92,12 +95,18 @@ impl Transform for ResolveLocalCalls {
                     }
                     if !has_skip {
                         // Collect declared variable names too, in case we need to track them.
+                        let mut names_in_decl = Vec::new();
                         for d in &decl.declarations {
                             if let BindingPattern::BindingIdentifier(id) = &d.id {
                                 local_function_names.insert(id.name.to_string());
+                                names_in_decl.push(id.name.to_string());
                             }
                         }
-                        context_parts.push(code);
+                        context_parts.push(code.clone());
+                        let free = helpers::free_identifier_references(stmt);
+                        for name in names_in_decl {
+                            function_free_refs.insert(name, free.clone());
+                        }
                     }
                 }
                 Statement::ExpressionStatement(expr_stmt) => {
@@ -126,10 +135,20 @@ impl Transform for ResolveLocalCalls {
         context_code.push_str(&context_parts.join(";\n"));
         context_code.push_str(";\n");
 
+        // Preflight: if concatenated context is not syntactically valid (e.g.
+        // duplicate const/let declarations hoisted from nested blocks), do not
+        // spawn the JS engine for calls that are guaranteed to fail.
+        let context_source = format!("{}\n", context_code);
+        let context_parse = Parser::new(ctx.allocator, &context_source, SourceType::mjs()).parse();
+        if !context_parse.errors.is_empty() {
+            return false;
+        }
+
         let mut visitor = LocalCallsVisitor {
             allocator: ctx.allocator,
             transform: self,
             local_functions: local_function_names,
+            function_free_refs,
             context_code,
             current_function: None,
             modified: false,
@@ -148,6 +167,7 @@ impl UnsafeTransform for ResolveLocalCalls {
 struct FunctionCollector {
     context_parts: Vec<String>,
     names: HashSet<String>,
+    free_refs: HashMap<String, HashSet<String>>,
 }
 
 impl<'a> Visit<'a> for FunctionCollector {
@@ -160,8 +180,10 @@ impl<'a> Visit<'a> for FunctionCollector {
                     && !helpers::contains_skip_word(&code)
                     && !helpers::SKIP_IDENTIFIERS.contains(&name.as_str())
                 {
-                    self.names.insert(name);
+                    self.names.insert(name.clone());
                     self.context_parts.push(code);
+                    self.free_refs
+                        .insert(name, helpers::free_identifier_references(statement));
                 }
             }
         }
@@ -169,12 +191,15 @@ impl<'a> Visit<'a> for FunctionCollector {
             let has_function_init = var_decl.declarations.iter().any(|declarator| {
                 matches!(
                     declarator.init.as_ref(),
-                    Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
+                    Some(
+                        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
+                    )
                 )
             });
             if has_function_init {
                 let code = helpers::statement_to_code(statement);
                 if code.len() <= 5_000 && !helpers::contains_skip_word(&code) {
+                    let mut names_in_decl = Vec::new();
                     for declarator in &var_decl.declarations {
                         let BindingPattern::BindingIdentifier(id) = &declarator.id else {
                             continue;
@@ -189,10 +214,18 @@ impl<'a> Visit<'a> for FunctionCollector {
                                     | Expression::ArrowFunctionExpression(_)
                             )
                         ) {
-                            self.names.insert(id.name.to_string());
+                            let name = id.name.to_string();
+                            self.names.insert(name.clone());
+                            names_in_decl.push(name);
                         }
                     }
-                    self.context_parts.push(code);
+                    if !names_in_decl.is_empty() {
+                        self.context_parts.push(code);
+                        let free = helpers::free_identifier_references(statement);
+                        for name in names_in_decl {
+                            self.free_refs.insert(name, free.clone());
+                        }
+                    }
                 }
             }
         }
@@ -204,6 +237,7 @@ struct LocalCallsVisitor<'a, 'b> {
     allocator: &'a oxc_allocator::Allocator,
     transform: &'b ResolveLocalCalls,
     local_functions: HashSet<String>,
+    function_free_refs: HashMap<String, HashSet<String>>,
     context_code: String,
     current_function: Option<String>,
     modified: bool,
@@ -244,18 +278,42 @@ impl<'a, 'b> VisitMut<'a> for LocalCallsVisitor<'a, 'b> {
 
                     if args_are_literal {
                         let call_code = helpers::expression_to_code(expr);
-                        if !call_code.is_empty() {
-                            let full_code = format!("{};\n{}", self.context_code, call_code);
-                            if let Ok(json_res) = self.transform.evaluator.eval_to_json(&full_code)
+                        if call_code.is_empty() {
+                            return;
+                        }
+
+                        // Preflight: only evaluate calls whose expression only
+                        // references bindings that are available in the context
+                        // (local functions/variables) or are known safe globals.
+                        // This avoids spawning the JS engine for calls that use
+                        // parameters or local variables from an enclosing scope.
+                        let referenced = helpers::collect_referenced_idents_expr(expr);
+                        let has_unresolved = referenced.iter().any(|name| {
+                            !self.local_functions.contains(name) && !helpers::is_known_global(name)
+                        });
+                        if has_unresolved {
+                            return;
+                        }
+
+                        // Check the callee's function body for references that are not
+                        // available in the accumulated context.
+                        if let Some(free) = self.function_free_refs.get(callee_name) {
+                            let has_unresolved_body = free.iter().any(|name| {
+                                !self.local_functions.contains(name)
+                                    && !helpers::is_known_global(name)
+                            });
+                            if has_unresolved_body {
+                                return;
+                            }
+                        }
+
+                        let full_code = format!("{};\n{}", self.context_code, call_code);
+                        if let Ok(json_res) = self.transform.evaluator.eval_to_json(&full_code) {
+                            if let Some(new_expr) =
+                                helpers::parse_expression_in(self.allocator, &json_res, expr.span())
                             {
-                                if let Some(new_expr) = helpers::parse_expression_in(
-                                    self.allocator,
-                                    &json_res,
-                                    expr.span(),
-                                ) {
-                                    *expr = new_expr;
-                                    self.modified = true;
-                                }
+                                *expr = new_expr;
+                                self.modified = true;
                             }
                         }
                     }

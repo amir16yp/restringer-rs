@@ -50,6 +50,10 @@ impl Transform for ResolveEvalCallsOnNonLiterals {
             };
 
             if let Some(arg_code) = arg_code {
+                if super::helpers::has_unresolved_references(&arg_code, SourceType::mjs()) {
+                    i += 1;
+                    continue;
+                }
                 match self.evaluator().eval_to_string(&arg_code) {
                     Ok(code_str) => {
                         if let Some(new_stmts) = parse_statements(ctx.allocator, &code_str) {
