@@ -1,8 +1,10 @@
+use oxc_allocator::Allocator;
 use oxc_ast::ast::*;
 use oxc_ast_visit::{Visit, VisitMut};
 use oxc_parser::Parser;
 use oxc_span::{GetSpan, SourceType};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use super::helpers;
 use super::js_runtime::JsEvaluator;
@@ -102,10 +104,10 @@ impl Transform for ResolveLocalCalls {
                                 names_in_decl.push(id.name.to_string());
                             }
                         }
-                        context_parts.push(code.clone());
-                        let free = helpers::free_identifier_references(stmt);
+                        context_parts.push(code);
+                        let free = Arc::new(helpers::free_identifier_references(stmt));
                         for name in names_in_decl {
-                            function_free_refs.insert(name, free.clone());
+                            function_free_refs.insert(name, Arc::clone(&free));
                         }
                     }
                 }
@@ -138,8 +140,9 @@ impl Transform for ResolveLocalCalls {
         // Preflight: if concatenated context is not syntactically valid (e.g.
         // duplicate const/let declarations hoisted from nested blocks), do not
         // spawn the JS engine for calls that are guaranteed to fail.
-        let context_source = format!("{}\n", context_code);
-        let context_parse = Parser::new(ctx.allocator, &context_source, SourceType::mjs()).parse();
+        let preflight_allocator = Allocator::default();
+        let context_parse =
+            Parser::new(&preflight_allocator, &context_code, SourceType::mjs()).parse();
         if !context_parse.errors.is_empty() {
             return false;
         }
@@ -150,7 +153,7 @@ impl Transform for ResolveLocalCalls {
             local_functions: local_function_names,
             function_free_refs,
             context_code,
-            current_function: None,
+            current_functions: Vec::new(),
             modified: false,
         };
         visitor.visit_program(program);
@@ -167,7 +170,7 @@ impl UnsafeTransform for ResolveLocalCalls {
 struct FunctionCollector {
     context_parts: Vec<String>,
     names: HashSet<String>,
-    free_refs: HashMap<String, HashSet<String>>,
+    free_refs: HashMap<String, Arc<HashSet<String>>>,
 }
 
 impl<'a> Visit<'a> for FunctionCollector {
@@ -182,8 +185,10 @@ impl<'a> Visit<'a> for FunctionCollector {
                 {
                     self.names.insert(name.clone());
                     self.context_parts.push(code);
-                    self.free_refs
-                        .insert(name, helpers::free_identifier_references(statement));
+                    self.free_refs.insert(
+                        name,
+                        Arc::new(helpers::free_identifier_references(statement)),
+                    );
                 }
             }
         }
@@ -221,9 +226,9 @@ impl<'a> Visit<'a> for FunctionCollector {
                     }
                     if !names_in_decl.is_empty() {
                         self.context_parts.push(code);
-                        let free = helpers::free_identifier_references(statement);
+                        let free = Arc::new(helpers::free_identifier_references(statement));
                         for name in names_in_decl {
-                            self.free_refs.insert(name, free.clone());
+                            self.free_refs.insert(name, Arc::clone(&free));
                         }
                     }
                 }
@@ -237,20 +242,21 @@ struct LocalCallsVisitor<'a, 'b> {
     allocator: &'a oxc_allocator::Allocator,
     transform: &'b ResolveLocalCalls,
     local_functions: HashSet<String>,
-    function_free_refs: HashMap<String, HashSet<String>>,
+    function_free_refs: HashMap<String, Arc<HashSet<String>>>,
     context_code: String,
-    current_function: Option<String>,
+    current_functions: Vec<String>,
     modified: bool,
 }
 
 impl<'a, 'b> VisitMut<'a> for LocalCallsVisitor<'a, 'b> {
     fn visit_function(&mut self, func: &mut Function<'a>, flags: oxc_syntax::scope::ScopeFlags) {
-        let prev = self.current_function.clone();
         if let Some(id) = &func.id {
-            self.current_function = Some(id.name.to_string());
+            self.current_functions.push(id.name.to_string());
+            oxc_ast_visit::walk_mut::walk_function(self, func, flags);
+            self.current_functions.pop();
+        } else {
+            oxc_ast_visit::walk_mut::walk_function(self, func, flags);
         }
-        oxc_ast_visit::walk_mut::walk_function(self, func, flags);
-        self.current_function = prev;
     }
 
     fn visit_expression(&mut self, expr: &mut Expression<'a>) {
@@ -262,7 +268,7 @@ impl<'a, 'b> VisitMut<'a> for LocalCallsVisitor<'a, 'b> {
 
                 // Do not evaluate if we are inside the function itself to avoid recursion,
                 // or if it's a global we should skip.
-                if Some(callee_name) == self.current_function.as_deref() {
+                if Some(callee_name) == self.current_functions.last().map(String::as_str) {
                     return;
                 }
 

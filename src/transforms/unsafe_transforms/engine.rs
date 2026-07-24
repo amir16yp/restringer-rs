@@ -137,12 +137,27 @@ impl JsEvaluator {
     }
 
     pub fn eval_to_json(&self, code: &str) -> Result<String, String> {
-        match self {
+        let result = match self {
             #[cfg(feature = "unsafe-transform-quickjs")]
             Self::QuickJs(engine) => engine.eval_to_json(code),
             #[cfg(feature = "unsafe-transform-deno")]
             Self::Deno(engine) => engine.eval_to_json(code),
+        }?;
+
+        // Reject results that are environment-dependent artifacts rather than
+        // meaningful deobfuscation outputs (e.g. stringified host objects or
+        // native function toString representations).
+        if result.contains("[native code]") || result.contains("[object ") {
+            if is_eval_verbose() {
+                eprintln!(
+                    "[verbose] eval_to_json rejected environment artifact: {}",
+                    result
+                );
+            }
+            return Err("Result contains environment-dependent artifact".to_string());
         }
+
+        Ok(result)
     }
 }
 

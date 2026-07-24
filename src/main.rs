@@ -2,7 +2,6 @@ use std::{
     ffi::OsStr,
     ffi::OsString,
     fs,
-    io::Read,
     path::{Path, PathBuf},
     process,
 };
@@ -10,6 +9,7 @@ use std::{
 use std::time::Duration;
 
 use clap::{ArgGroup, Parser as ClapParser};
+use memmap2::{Mmap, MmapOptions};
 use oxc_span::SourceType;
 
 use restringer_rs::{DeobfuscateOptions, Engine, Restringer, set_default_engine};
@@ -97,11 +97,21 @@ fn main() {
     }
 
     let input_path = cli.input_filename;
-    let source_text = match read_file_to_string_with_capacity(&input_path) {
-        Ok(s) => s,
+    let source_map = match map_input_file(&input_path) {
+        Ok(map) => map,
         Err(e) => {
             eprintln!(
-                "[-] Critical Error: Failed to read {}: {e}",
+                "[-] Critical Error: Failed to map {}: {e}",
+                input_path.display()
+            );
+            process::exit(1);
+        }
+    };
+    let source_text = match std::str::from_utf8(source_map.as_deref().unwrap_or_default()) {
+        Ok(source) => source,
+        Err(e) => {
+            eprintln!(
+                "[-] Critical Error: Failed to decode {} as UTF-8: {e}",
                 input_path.display()
             );
             process::exit(1);
@@ -146,7 +156,7 @@ fn main() {
         restringer.set_print_comments(false);
     }
     let result = match restringer.deobfuscate(
-        &source_text,
+        source_text,
         DeobfuscateOptions {
             clean: cli.clean,
             run_unsafe: !cli.no_unsafe,
@@ -185,16 +195,12 @@ fn main() {
     }
 }
 
-fn read_file_to_string_with_capacity(path: &Path) -> std::io::Result<String> {
-    let mut file = fs::File::open(path)?;
-    let cap = file
-        .metadata()
-        .ok()
-        .and_then(|m| usize::try_from(m.len()).ok())
-        .unwrap_or(0);
-    let mut s = String::with_capacity(cap.saturating_add(1));
-    file.read_to_string(&mut s)?;
-    Ok(s)
+fn map_input_file(path: &Path) -> std::io::Result<Option<Mmap>> {
+    let file = fs::File::open(path)?;
+    if file.metadata()?.is_file() && file.metadata()?.len() == 0 {
+        return Ok(None);
+    }
+    unsafe { MmapOptions::new().map(&file).map(Some) }
 }
 
 fn resolve_output_path(input_path: &Path, output: Option<&OsStr>) -> PathBuf {

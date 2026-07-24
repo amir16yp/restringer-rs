@@ -13,9 +13,10 @@ fn log_eval_result(op: &str, input: &str, output: &Result<String, String>) {
             let out_len = out.len();
             let delta = out_len as i64 - input_len as i64;
             let sign = if delta >= 0 { "+" } else { "" };
+            let input_preview: String = input.chars().take(120).collect();
             eprintln!(
-                "[verbose] deno {}: {} -> {} chars (Δ {}{})",
-                op, input_len, out_len, sign, delta
+                "[verbose] deno {}: {} -> {} chars (Δ {}{}), input {:?}, newchars {}",
+                op, input_len, out_len, sign, delta, input_preview, out
             );
         }
         Err(err) => {
@@ -45,12 +46,14 @@ impl DenoEngine {
             .spawn()
             .map_err(|e| format!("Failed to spawn Deno process: {}", e))?;
 
-        if let Some(mut stdin) = child.stdin.take() {
-            let script = script.to_string();
-            std::thread::spawn(move || {
-                let _ = stdin.write_all(script.as_bytes());
-            });
-        }
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "Failed to open Deno stdin".to_string())?;
+        stdin
+            .write_all(script.as_bytes())
+            .map_err(|e| format!("Failed to write Deno script: {}", e))?;
+        drop(stdin);
 
         let output = child
             .wait_with_output()
@@ -101,7 +104,19 @@ impl DenoEngine {
 
     pub fn eval_to_json(&self, code: &str) -> Result<String, String> {
         let script = format!(
-            "const __v = globalThis.eval({}); if (typeof __v === 'undefined') {{ throw new Error('undefined result'); }} if (typeof __v === 'function') {{ throw new Error('function result'); }} console.log(JSON.stringify(__v));",
+            concat!(
+                "const __v = globalThis.eval({});",
+                " if (typeof __v === 'undefined') {{ throw new Error('undefined result'); }}",
+                " if (typeof __v === 'function') {{",
+                "   const __src = __v.toString();",
+                "   if (__src.includes('[native code]')) {{ throw new Error('native function result'); }}",
+                "   console.log(__src);",
+                " }} else if (typeof __v === 'object' && __v !== null && !Array.isArray(__v) && Object.getPrototypeOf(__v) !== Object.prototype) {{",
+                "   throw new Error('non-plain object result');",
+                " }} else {{",
+                "   console.log(JSON.stringify(__v));",
+                " }}",
+            ),
             escape_js_string(code)
         );
         let output = self.run(&script);

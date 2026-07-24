@@ -123,7 +123,20 @@ impl QuickJsEngine {
                 return Err("Result is undefined".to_string());
             }
             if result.is_function() {
-                return Err("Result is a function".to_string());
+                // Get the function source via Function.prototype.toString()
+                let to_string: rquickjs::Function = ctx
+                    .eval("(function(f) { return f.toString(); })")
+                    .map_err(|e| format!("Failed to create toString helper: {}", e))?;
+                let src: String = to_string
+                    .call((result,))
+                    .map_err(|e| format!("Failed to call toString on function: {}", e))?;
+                if src.contains("[native code]") {
+                    return Err("Result is a native function".to_string());
+                }
+                if is_eval_verbose() {
+                    eprintln!("[verbose] quickjs result (function): {}", src);
+                }
+                return Ok(src);
             }
 
             let value = ctx

@@ -10,6 +10,7 @@ unsafe-transform-deno = []
 
 [dependencies]
  clap = { version = "4.6.0", features = ["derive"] }
+memmap2 = "0.9"
  rquickjs = { version = "0.8", features = ["array-buffer", "classes"], optional = true }
  oxc_allocator = "0.123.0"
  oxc_ast = "0.123.0"
